@@ -1,7 +1,7 @@
 // Configuration
 const OPENROUTER_API_KEY = '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';
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'google/gemma-3n-e4b-it:free';
+const MODEL = 'google/gemma-3n-e4b-it';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('[MedComplete Background] Received message:', request);

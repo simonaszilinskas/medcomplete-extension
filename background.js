@@ -33,7 +33,31 @@ Text: "${context}"
 
 Continuation (max 15 words):`;
 
-    console.log('[MedComplete Background] Sending API request...');
+    const requestBody = {
+      model: MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 50
+    };
+    
+    console.log('[MedComplete Background] Sending API request:', {
+      url: API_URL,
+      model: MODEL,
+      prompt: prompt,
+      requestBody: requestBody,
+      headers: {
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'chrome-extension://medcomplete',
+        'X-Title': 'MedComplete Extension',
+        'Authorization': `Bearer ${OPENROUTER_API_KEY.substring(0, 20)}...` // Only show first 20 chars
+      }
+    });
+    
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -42,21 +66,18 @@ Continuation (max 15 words):`;
         'HTTP-Referer': 'chrome-extension://medcomplete',
         'X-Title': 'MedComplete Extension'
       },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 50
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error('[MedComplete Background] API request failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorText
+      });
+      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -80,12 +101,47 @@ Continuation (max 15 words):`;
       return completion;
     }
     
-    throw new Error('Invalid API response format');
+    console.error('[MedComplete Background] Invalid API response format:', {
+      hasChoices: !!data.choices,
+      choicesLength: data.choices ? data.choices.length : 0,
+      firstChoice: data.choices && data.choices[0] ? data.choices[0] : null,
+      fullResponse: data
+    });
+    throw new Error('Invalid API response format - no choices or message found');
     
   } catch (error) {
-    console.error('Error getting suggestion:', error);
+    console.error('[MedComplete Background] Comprehensive error details:', {
+      errorType: error.constructor.name,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      context: context,
+      timestamp: new Date().toISOString(),
+      apiUrl: API_URL,
+      model: MODEL
+    });
+    
+    // Log network-related errors specifically
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      console.error('[MedComplete Background] Network error - check internet connection and API endpoint');
+    }
+    
+    // Log authentication errors
+    if (error.message.includes('401') || error.message.includes('403')) {
+      console.error('[MedComplete Background] Authentication error - check API key validity');
+    }
+    
+    // Log rate limiting
+    if (error.message.includes('429')) {
+      console.error('[MedComplete Background] Rate limit exceeded - too many requests');
+    }
+    
+    // Log quota/billing issues
+    if (error.message.includes('402') || error.message.includes('payment')) {
+      console.error('[MedComplete Background] Billing/quota error - check OpenRouter account balance');
+    }
     
     // Fallback to simple completions on error
+    console.log('[MedComplete Background] Using fallback suggestion due to API error');
     return getFallbackSuggestion(context);
   }
 }

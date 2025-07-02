@@ -1,16 +1,31 @@
 // Configuration
-const OPENROUTER_API_KEY = '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';
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'google/gemma-3n-e4b-it';
+const DEFAULT_MODEL = 'mistralai/mistral-small-3.2-24b-instruct';
+
+// Get API key from storage
+async function getApiKey() {
+  const result = await chrome.storage.local.get(['openrouterApiKey']);
+  return result.openrouterApiKey;
+}
+
+// Get model from storage (with fallback)
+async function getModel() {
+  const result = await chrome.storage.local.get(['selectedModel']);
+  return result.selectedModel || DEFAULT_MODEL;
+}
 
 // Test API key on extension load
-console.log('[MedComplete Background] Extension loaded with API key:', {
-  keyPresent: !!OPENROUTER_API_KEY,
-  keyLength: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.length : 0,
-  keyFormat: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.startsWith('sk-or-v1-') : false,
-  apiUrl: API_URL,
-  model: MODEL
-});
+(async () => {
+  const apiKey = await getApiKey();
+  const model = await getModel();
+  console.log('[MedComplete Background] Extension loaded:', {
+    keyPresent: !!apiKey,
+    keyLength: apiKey ? apiKey.length : 0,
+    keyFormat: apiKey ? apiKey.startsWith('sk-or-v1-') : false,
+    apiUrl: API_URL,
+    model: model
+  });
+})();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('[MedComplete Background] Received message:', request);
@@ -30,16 +45,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function getSuggestion(context) {
+  // Get API key and model from storage
+  const apiKey = await getApiKey();
+  const model = await getModel();
+  
   try {
     console.log('[MedComplete Background] Getting suggestion for:', context);
     
+    if (!apiKey) {
+      throw new Error('No API key configured. Please set your OpenRouter API key in the extension settings.');
+    }
+    
     // Log API key validation
     console.log('[MedComplete Background] API Key validation:', {
-      exists: !!OPENROUTER_API_KEY,
-      length: OPENROUTER_API_KEY.length,
-      format: OPENROUTER_API_KEY.startsWith('sk-or-v1-'),
-      firstChars: OPENROUTER_API_KEY.substring(0, 15),
-      lastChars: OPENROUTER_API_KEY.substring(OPENROUTER_API_KEY.length - 10)
+      exists: !!apiKey,
+      length: apiKey.length,
+      format: apiKey.startsWith('sk-or-v1-'),
+      firstChars: apiKey.substring(0, 15),
+      lastChars: apiKey.substring(apiKey.length - 10)
     });
     
     // Create a medical-focused prompt for completion
@@ -52,7 +75,7 @@ Text: "${context}"
 Continuation (max 15 words):`;
 
     const requestBody = {
-      model: MODEL,
+      model: model,
       messages: [
         {
           role: 'user',
@@ -65,14 +88,14 @@ Continuation (max 15 words):`;
     
     const requestDetails = {
       url: API_URL,
-      model: MODEL,
+      model: model,
       prompt: prompt,
       requestBody: requestBody,
       headers: {
         'Content-Type': 'application/json',
         'HTTP-Referer': 'chrome-extension://medcomplete',
         'X-Title': 'MedComplete Extension',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY.substring(0, 20)}...` // Only show first 20 chars
+        'Authorization': `Bearer ${apiKey.substring(0, 20)}...` // Only show first 20 chars
       }
     };
     console.log('[MedComplete Background] Sending API request:', JSON.stringify(requestDetails, null, 2));
@@ -81,7 +104,7 @@ Continuation (max 15 words):`;
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'HTTP-Referer': 'https://medcomplete.extension',
         'X-Title': 'MedComplete Extension',
         'Origin': 'chrome-extension://medcomplete'
@@ -139,7 +162,7 @@ Continuation (max 15 words):`;
       context: context,
       timestamp: new Date().toISOString(),
       apiUrl: API_URL,
-      model: MODEL
+      model: model
     };
     console.error('[MedComplete Background] Comprehensive error details:', JSON.stringify(errorDetails, null, 2));
     
@@ -152,9 +175,9 @@ Continuation (max 15 words):`;
     if (error.message.includes('401') || error.message.includes('403')) {
       console.error('[MedComplete Background] Authentication error - check API key validity');
       const keyCheck = {
-        keyExists: !!OPENROUTER_API_KEY,
-        keyLength: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.length : 0,
-        keyPrefix: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.substring(0, 10) : 'none',
+        keyExists: !!apiKey,
+        keyLength: apiKey ? apiKey.length : 0,
+        keyPrefix: apiKey ? apiKey.substring(0, 10) : 'none',
         expectedFormat: 'sk-or-v1-...'
       };
       console.error('[MedComplete Background] API Key format check:', JSON.stringify(keyCheck, null, 2));

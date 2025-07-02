@@ -1,0 +1,165 @@
+.medcomplete-suggestion {
+  position: absolute;
+  background-color: #f0f4f8;
+  border: 1px solid #d1d9e0;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: #64748b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 999999;
+  max-width: 400px;
+  display: none;
+  animation: fadeIn 0.2s ease-in-out;
+  line-height: 1.4;
+}
+
+.medcomplete-suggestion::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 6px 6px 0;
+  border-color: transparent #f0f4f8 transparent transparent;
+}
+
+.medcomplete-suggestion::after {
+  content: 'Tab to accept';
+  position: absolute;
+  bottom: -20px;
+  right: 0;
+  font-size: 11px;
+  color: #94a3b8;
+  background-color: #f8fafc;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #e2e8f0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Proactive indicator styles */
+.medcomplete-suggestion.medcomplete-indicator {
+  background-color: #3b82f6;
+  color: white;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: auto;
+  animation: pulse 2s infinite;
+}
+
+/* Preview state */
+.medcomplete-suggestion.medcomplete-preview {
+  background-color: #dbeafe;
+  border: 2px solid #3b82f6;
+  color: #1e40af;
+  font-weight: 500;
+  animation: none;
+}
+
+.medcomplete-suggestion.medcomplete-preview::after {
+  content: 'Tab again to accept';
+  bottom: -22px;
+  background-color: #3b82f6;
+  color: white;
+  font-weight: 500;
+}
+
+.medcomplete-suggestion.medcomplete-indicator::before {
+  display: none;
+}
+
+.medcomplete-suggestion.medcomplete-indicator::after {
+  display: none;
+}
+
+.medcomplete-suggestion.medcomplete-indicator:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .medcomplete-suggestion {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+  }
+  
+  .medcomplete-suggestion::before {
+    border-color: transparent #1e293b transparent transparent;
+  }
+  
+  .medcomplete-suggestion::after {
+    background-color: #0f172a;
+    border-color: #1e293b;
+    color: #64748b;
+  }
+  
+  .medcomplete-suggestion.medcomplete-indicator {
+    background-color: #2563eb;
+  }
+  
+  .medcomplete-suggestion.medcomplete-preview {
+    background-color: #1e3a8a;
+    border-color: #60a5fa;
+    color: #dbeafe;
+  }
+  
+  .medcomplete-suggestion.medcomplete-preview::after {
+    background-color: #1e3a8a;
+    border-color: #334155;
+  }
+}

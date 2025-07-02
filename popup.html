@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f8fafc;
+      margin: 0;
+    }
+    
+    h1 {
+      font-size: 18px;
+      margin: 0 0 16px 0;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 12px;
+      background-color: #e0f2fe;
+      border-radius: 6px;
+      font-size: 14px;
+      color: #0369a1;
+    }
+    
+    .status.inactive {
+      background-color: #fee2e2;
+      color: #dc2626;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #22c55e;
+    }
+    
+    .status.inactive .status-dot {
+      background-color: #ef4444;
+    }
+    
+    .instructions {
+      background-color: white;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 16px;
+    }
+    
+    .instructions h2 {
+      font-size: 14px;
+      margin: 0 0 8px 0;
+      color: #475569;
+    }
+    
+    .instructions p {
+      margin: 0;
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+    
+    .shortcuts {
+      background-color: white;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .shortcuts h2 {
+      font-size: 14px;
+      margin: 0 0 8px 0;
+      color: #475569;
+    }
+    
+    .shortcut-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    
+    .shortcut-key {
+      background-color: #f1f5f9;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .footer {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 12px;
+      color: #94a3b8;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7L12 12L22 7L12 2Z"></path>
+      <path d="M2 17L12 22L22 17"></path>
+      <path d="M2 12L12 17L22 12"></path>
+    </svg>
+    MedComplete
+  </h1>
+  
+  <div class="status" id="status">
+    <span class="status-dot"></span>
+    <span>Active on this page</span>
+  </div>
+  
+  <div class="instructions">
+    <h2>How to use</h2>
+    <p>
+      Start typing in any text field. The extension will automatically show a <strong>Tab</strong> indicator when suggestions are available. 
+      Press Tab to accept the AI-generated medical text completion.
+    </p>
+    <p style="margin-top: 8px; font-size: 12px; color: #94a3b8;">
+      <strong>Note:</strong> Works with standard web forms, EMR systems, medical platforms, and Google Docs. 
+      In Google Docs, suggestions are inserted via clipboard.
+    </p>
+  </div>
+  
+  <div class="shortcuts">
+    <h2>Features</h2>
+    <div class="shortcut-item">
+      <span>Auto-suggest after</span>
+      <span class="shortcut-key">750ms pause</span>
+    </div>
+    <div class="shortcut-item">
+      <span>Triggers on</span>
+      <span class="shortcut-key">Punctuation</span>
+    </div>
+    <div class="shortcut-item">
+      <span>Preview suggestion</span>
+      <span class="shortcut-key">Tab</span>
+    </div>
+    <div class="shortcut-item">
+      <span>Accept suggestion</span>
+      <span class="shortcut-key">Tab × 2</span>
+    </div>
+    <div class="shortcut-item">
+      <span>Dismiss suggestion</span>
+      <span class="shortcut-key">Esc</span>
+    </div>
+  </div>
+  
+  <div class="footer">
+    Powered by Gemma AI via OpenRouter
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

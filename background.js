@@ -45,7 +45,7 @@ Continuation (max 15 words):`;
       max_tokens: 50
     };
     
-    console.log('[MedComplete Background] Sending API request:', {
+    const requestDetails = {
       url: API_URL,
       model: MODEL,
       prompt: prompt,
@@ -56,7 +56,8 @@ Continuation (max 15 words):`;
         'X-Title': 'MedComplete Extension',
         'Authorization': `Bearer ${OPENROUTER_API_KEY.substring(0, 20)}...` // Only show first 20 chars
       }
-    });
+    };
+    console.log('[MedComplete Background] Sending API request:', JSON.stringify(requestDetails, null, 2));
     
     const response = await fetch(API_URL, {
       method: 'POST',
@@ -71,12 +72,13 @@ Continuation (max 15 words):`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[MedComplete Background] API request failed:', {
+      const errorDetails = {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
         body: errorText
-      });
+      };
+      console.error('[MedComplete Background] API request failed:', JSON.stringify(errorDetails, null, 2));
       throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
@@ -101,16 +103,17 @@ Continuation (max 15 words):`;
       return completion;
     }
     
-    console.error('[MedComplete Background] Invalid API response format:', {
+    const responseDetails = {
       hasChoices: !!data.choices,
       choicesLength: data.choices ? data.choices.length : 0,
       firstChoice: data.choices && data.choices[0] ? data.choices[0] : null,
       fullResponse: data
-    });
+    };
+    console.error('[MedComplete Background] Invalid API response format:', JSON.stringify(responseDetails, null, 2));
     throw new Error('Invalid API response format - no choices or message found');
     
   } catch (error) {
-    console.error('[MedComplete Background] Comprehensive error details:', {
+    const errorDetails = {
       errorType: error.constructor.name,
       errorMessage: error.message,
       errorStack: error.stack,
@@ -118,7 +121,8 @@ Continuation (max 15 words):`;
       timestamp: new Date().toISOString(),
       apiUrl: API_URL,
       model: MODEL
-    });
+    };
+    console.error('[MedComplete Background] Comprehensive error details:', JSON.stringify(errorDetails, null, 2));
     
     // Log network-related errors specifically
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
@@ -128,6 +132,12 @@ Continuation (max 15 words):`;
     // Log authentication errors
     if (error.message.includes('401') || error.message.includes('403')) {
       console.error('[MedComplete Background] Authentication error - check API key validity');
+      console.error('[MedComplete Background] API Key format check:', {
+        keyExists: !!OPENROUTER_API_KEY,
+        keyLength: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.length : 0,
+        keyPrefix: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.substring(0, 10) : 'none',
+        expectedFormat: 'sk-or-v1-...'
+      });
     }
     
     // Log rate limiting

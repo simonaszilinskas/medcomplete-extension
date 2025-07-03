@@ -4,12 +4,10 @@ AI-powered medical autocomplete Chrome extension for healthcare professionals.
 
 ## Features
 
-- **Real-time AI suggestions** - Powered by Gemma AI via OpenRouter
-- **Proactive indicators** - Shows "Tab" button when suggestions are available  
-- **Two-step acceptance** - Tab to preview, Tab again to accept
-- **Cross-platform support** - Works on standard web forms AND Google Docs
-- **Medical-focused** - Trained prompts for medical documentation
-- **Privacy-first** - Processes text locally, only sends context to AI
+- **Real-time AI suggestions** - Powered by Gemma via OpenRouter - soon to be powered by MedGemma via Vertex AI. 
+- **Proactive indicators** - Shows "Tab" button when suggestions are available.
+- **Two-step acceptance** - Tab to preview, Tab again to accept. 
+- **Medical-focused** - Prompts for medical documentation.
 
 ## How it Works
 
@@ -24,13 +22,6 @@ AI-powered medical autocomplete Chrome extension for healthcare professionals.
 - After **750ms pause** in typing
 - When text ends with **punctuation** (. : , ;)
 - After **5+ words** or **20+ characters**
-
-## Supported Platforms
-
-✅ **Standard web forms** (EMR systems, email, etc.)  
-✅ **Google Docs** (via clipboard insertion)  
-✅ **Medical platforms** (Epic MyChart, Cerner, etc.)  
-✅ **Email clients** (Gmail, Outlook web)  
 
 ## Installation
 
@@ -59,7 +50,7 @@ medcomplete/
 ## Development
 
 ### API Configuration
-The extension uses OpenRouter's free Gemma model. The API key is currently hardcoded in `background.js` but should be moved to user settings in production.
+The extension uses OpenRouter's Gemma model for now - at term it shall use MedGemma powered by Vertex AI. The API key is in user settings.
 
 ### Key Components
 
@@ -79,15 +70,6 @@ The extension uses OpenRouter's free Gemma model. The API key is currently hardc
 - Animated indicators and previews
 - Dark mode support
 
-### Testing
-
-Test the extension on various platforms:
-- Gmail compose window
-- Medical EMR systems  
-- Google Docs
-- Standard web forms
-- Reddit/forum comments
-
 ### Debugging
 
 Enable Chrome DevTools console to see detailed logs:
@@ -96,23 +78,17 @@ Enable Chrome DevTools console to see detailed logs:
 
 ## Future Enhancements
 
-- User-configurable API keys
-- Customizable trigger settings
-- Medical specialty-specific suggestions
-- Local LLM integration for privacy
-- Integration with popular EMR systems
-- Usage analytics and learning
-
-## Privacy & Security
-
-- Only sends text context (last 100 characters) to AI
-- No personal data stored
-- API calls are logged for debugging only
-- Clipboard access only used for Google Docs insertion
+- Checking for overrites by the models - if the model produces text that already exists, merge and complete it.
+- Send more context to the model.
+- Improve speed. 
+- Use of MedGemma as the model.
+- Memory that adds up in context that detects the specialty of the user and adapts. 
+- Local LLM integration for privacy with WebGPU.
+- Memore and learning fatures. 
 
 ## License
 
-MIT License - See LICENSE file for details.
+TBD
 
 ## Contributing
 

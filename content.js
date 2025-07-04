@@ -1,7 +1,6 @@
 let currentElement = null;
 let suggestionElement = null;
 let isShowingSuggestion = false;
-let isShowingPreview = false;
 let debounceTimer = null;
 let lastProcessedText = '';
 let pendingRequest = null;
@@ -66,32 +65,19 @@ function handleBlur(e) {
 
 // Handle keydown events
 function handleKeyDown(e) {
-  console.log('[MedComplete] Key pressed:', e.key, 'ctrl:', e.ctrlKey, 'isShowingSuggestion:', isShowingSuggestion, 'isShowingPreview:', isShowingPreview);
+  console.log('[MedComplete] Key pressed:', e.key, 'isShowingSuggestion:', isShowingSuggestion);
   
-  // Ctrl+Space for suggestions
-  if (e.key === ' ' && e.ctrlKey && currentElement) {
-    if (isShowingSuggestion && suggestionElement) {
-      e.preventDefault();
-      console.log('[MedComplete] Ctrl+Space pressed with suggestion available');
-      
-      if (isShowingPreview) {
-        // Second Ctrl+Space press - accept suggestion
-        console.log('[MedComplete] Second Ctrl+Space - accepting suggestion');
-        acceptSuggestion();
-      } else {
-        // First Ctrl+Space press - show preview
-        console.log('[MedComplete] First Ctrl+Space - showing preview');
-        showFullSuggestion();
-        isShowingPreview = true;
-      }
-    } else {
-      console.log('[MedComplete] Ctrl+Space pressed but no suggestion available');
-    }
+  // Tab for suggestions - but ONLY when suggestion is available
+  if (e.key === 'Tab' && !e.shiftKey && currentElement && isShowingSuggestion && suggestionElement) {
+    e.preventDefault();
+    console.log('[MedComplete] Tab pressed with suggestion available - accepting immediately');
+    acceptSuggestion();
   } else if (e.key === 'Escape' && isShowingSuggestion) {
     console.log('[MedComplete] Escape pressed - hiding suggestion');
     hideSuggestion();
   } else {
     // Handle proactive suggestions on typing
+    // Note: Tab without suggestion will work normally for form navigation
     handleTyping();
   }
 }
@@ -242,10 +228,10 @@ function showProactiveIndicator() {
     const docsContainer = document.querySelector('.kix-appview-editor');
     if (docsContainer) {
       const rect = docsContainer.getBoundingClientRect();
-      x = rect.right - 100;
+      x = rect.right - 200;
       y = rect.top + 100;
     } else {
-      x = window.innerWidth - 100;
+      x = window.innerWidth - 200;
       y = 100;
     }
   } else {
@@ -263,7 +249,7 @@ function showProactiveIndicator() {
       context.font = style.font;
       
       const textWidth = context.measureText(currentElement.value).width;
-      x += Math.min(textWidth + 5, rect.width - 100);
+      x += Math.min(textWidth + 5, rect.width - 200);
       y += rect.height / 2;
     } else if (selection.rangeCount > 0) {
       // For contenteditable, use selection position
@@ -274,44 +260,21 @@ function showProactiveIndicator() {
     }
   }
   
-  // Show minimal indicator
-  suggestionElement.className = 'medcomplete-suggestion medcomplete-indicator';
-  suggestionElement.textContent = 'Ctrl+Space';
+  // Show full suggestion by default
+  suggestionElement.className = 'medcomplete-suggestion';
+  suggestionElement.textContent = suggestionElement.dataset.suggestion || 'Suggestion available';
   suggestionElement.style.left = x + 'px';
   suggestionElement.style.top = y + 'px';
   suggestionElement.style.display = 'block';
-  
-  // Add event listener to show full suggestion on hover
-  suggestionElement.addEventListener('mouseenter', showFullSuggestion);
-  suggestionElement.addEventListener('mouseleave', hideFullSuggestion);
 }
 
-// Show full suggestion on hover
-function showFullSuggestion() {
-  if (suggestionElement && suggestionElement.dataset.suggestion) {
-    suggestionElement.className = 'medcomplete-suggestion medcomplete-preview';
-    suggestionElement.textContent = suggestionElement.dataset.suggestion;
-    isShowingPreview = true;
-  }
-}
-
-// Hide full suggestion
-function hideFullSuggestion() {
-  if (suggestionElement && !isShowingPreview) {
-    suggestionElement.className = 'medcomplete-suggestion medcomplete-indicator';
-    suggestionElement.textContent = 'Ctrl+Space';
-  }
-}
 
 // Hide suggestion
 function hideSuggestion() {
   if (suggestionElement) {
     suggestionElement.style.display = 'none';
-    suggestionElement.removeEventListener('mouseenter', showFullSuggestion);
-    suggestionElement.removeEventListener('mouseleave', hideFullSuggestion);
   }
   isShowingSuggestion = false;
-  isShowingPreview = false;
   lastProcessedText = ''; // Reset so we can suggest again
 }
 
@@ -409,21 +372,14 @@ function setupGoogleDocsListeners() {
 
 // Handle Google Docs keyboard events
 function handleGoogleDocsKeyDown(e) {
-  console.log('[MedComplete] Google Docs key:', e.key, 'ctrl:', e.ctrlKey, 'isShowingSuggestion:', isShowingSuggestion);
+  console.log('[MedComplete] Google Docs key:', e.key, 'isShowingSuggestion:', isShowingSuggestion);
   
-  // Ctrl+Space for suggestions in Google Docs
-  if (e.key === ' ' && e.ctrlKey && isShowingSuggestion) {
+  // Tab for suggestions in Google Docs - only when suggestion is available
+  if (e.key === 'Tab' && !e.shiftKey && isShowingSuggestion) {
     e.preventDefault();
     e.stopPropagation();
-    
-    if (isShowingPreview) {
-      console.log('[MedComplete] Google Docs - accepting suggestion');
-      acceptGoogleDocsSuggestion();
-    } else {
-      console.log('[MedComplete] Google Docs - showing preview');
-      showFullSuggestion();
-      isShowingPreview = true;
-    }
+    console.log('[MedComplete] Google Docs - accepting suggestion immediately');
+    acceptGoogleDocsSuggestion();
   } else if (e.key === 'Escape' && isShowingSuggestion) {
     hideSuggestion();
   } else {

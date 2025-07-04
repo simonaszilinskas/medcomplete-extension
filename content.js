@@ -79,14 +79,14 @@ function handleBlur(e) {
 
 // Handle keydown events
 function handleKeyDown(e) {
-  console.log('[MedComplete] Key pressed:', e.key, 'Ctrl:', e.ctrlKey, 'isShowingSuggestion:', isShowingSuggestion);
+  console.log('[MedComplete] Key pressed:', e.key, 'isShowingSuggestion:', isShowingSuggestion);
   
-  // Ctrl+Space for instant proactive suggestion
-  if (e.key === ' ' && e.ctrlKey && currentElement) {
+  // § key for instant proactive suggestion
+  if (e.key === '§' && currentElement) {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-    console.log('[MedComplete] Ctrl+Space pressed - requesting instant suggestion');
+    console.log('[MedComplete] § key pressed - requesting instant suggestion');
     requestInstantSuggestion();
     return;
   }
@@ -159,7 +159,7 @@ function handleTyping() {
   }, 400); // 400ms delay (reduced from 750ms)
 }
 
-// Request instant suggestion (triggered by Ctrl+Space)
+// Request instant suggestion (triggered by § key)
 function requestInstantSuggestion() {
   const context = getContext();
   console.log('[MedComplete] Instant suggestion requested, context:', context);
@@ -200,23 +200,13 @@ function checkForSuggestion() {
   const lastChar = context.slice(-1);
   const endsWithPunctuation = ['.', ':', ',', ';'].includes(lastChar);
   
-  // Check for medical keywords to be more proactive
-  const medicalKeywords = ['patient', 'diagnosis', 'treatment', 'symptom', 'medication', 'history', 'exam', 'assessment', 'plan', 'follow'];
-  const containsMedicalKeyword = medicalKeywords.some(keyword => 
-    context.toLowerCase().includes(keyword)
-  );
+  console.log('[MedComplete] Trigger check - punctuation:', endsWithPunctuation, 'words:', words.length, 'chars:', context.length);
   
-  console.log('[MedComplete] Trigger check - punctuation:', endsWithPunctuation, 'words:', words.length, 'chars:', context.length, 'medical:', containsMedicalKeyword);
-  
-  // More aggressive triggers for faster suggestions:
+  // Simplified triggers for faster suggestions:
   // 1. Ends with punctuation, OR
-  // 2. Has at least 3 words (reduced from 5), OR  
-  // 3. Has at least 15 characters (reduced from 20), OR
-  // 4. Contains medical keywords and has at least 2 words
-  if (endsWithPunctuation || 
-      words.length >= 3 || 
-      context.length >= 15 || 
-      (containsMedicalKeyword && words.length >= 2)) {
+  // 2. Has at least 3 words, OR  
+  // 3. Has at least 15 characters
+  if (endsWithPunctuation || words.length >= 3 || context.length >= 15) {
     console.log('[MedComplete] Triggering suggestion request');
     lastProcessedText = context;
     requestSuggestion();

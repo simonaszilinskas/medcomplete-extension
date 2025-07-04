@@ -66,25 +66,26 @@ function handleBlur(e) {
 
 // Handle keydown events
 function handleKeyDown(e) {
-  console.log('[MedComplete] Key pressed:', e.key, 'isShowingSuggestion:', isShowingSuggestion, 'isShowingPreview:', isShowingPreview);
+  console.log('[MedComplete] Key pressed:', e.key, 'ctrl:', e.ctrlKey, 'isShowingSuggestion:', isShowingSuggestion, 'isShowingPreview:', isShowingPreview);
   
-  if (e.key === 'Tab' && !e.shiftKey && currentElement) {
+  // Ctrl+Space for suggestions
+  if (e.key === ' ' && e.ctrlKey && currentElement) {
     if (isShowingSuggestion && suggestionElement) {
       e.preventDefault();
-      console.log('[MedComplete] Tab pressed with suggestion available');
+      console.log('[MedComplete] Ctrl+Space pressed with suggestion available');
       
       if (isShowingPreview) {
-        // Second Tab press - accept suggestion
-        console.log('[MedComplete] Second Tab - accepting suggestion');
+        // Second Ctrl+Space press - accept suggestion
+        console.log('[MedComplete] Second Ctrl+Space - accepting suggestion');
         acceptSuggestion();
       } else {
-        // First Tab press - show preview
-        console.log('[MedComplete] First Tab - showing preview');
+        // First Ctrl+Space press - show preview
+        console.log('[MedComplete] First Ctrl+Space - showing preview');
         showFullSuggestion();
         isShowingPreview = true;
       }
     } else {
-      console.log('[MedComplete] Tab pressed but no suggestion available');
+      console.log('[MedComplete] Ctrl+Space pressed but no suggestion available');
     }
   } else if (e.key === 'Escape' && isShowingSuggestion) {
     console.log('[MedComplete] Escape pressed - hiding suggestion');
@@ -275,7 +276,7 @@ function showProactiveIndicator() {
   
   // Show minimal indicator
   suggestionElement.className = 'medcomplete-suggestion medcomplete-indicator';
-  suggestionElement.textContent = 'Tab';
+  suggestionElement.textContent = 'Ctrl+Space';
   suggestionElement.style.left = x + 'px';
   suggestionElement.style.top = y + 'px';
   suggestionElement.style.display = 'block';
@@ -298,7 +299,7 @@ function showFullSuggestion() {
 function hideFullSuggestion() {
   if (suggestionElement && !isShowingPreview) {
     suggestionElement.className = 'medcomplete-suggestion medcomplete-indicator';
-    suggestionElement.textContent = 'Tab';
+    suggestionElement.textContent = 'Ctrl+Space';
   }
 }
 
@@ -408,9 +409,10 @@ function setupGoogleDocsListeners() {
 
 // Handle Google Docs keyboard events
 function handleGoogleDocsKeyDown(e) {
-  console.log('[MedComplete] Google Docs key:', e.key, 'isShowingSuggestion:', isShowingSuggestion);
+  console.log('[MedComplete] Google Docs key:', e.key, 'ctrl:', e.ctrlKey, 'isShowingSuggestion:', isShowingSuggestion);
   
-  if (e.key === 'Tab' && !e.shiftKey && isShowingSuggestion) {
+  // Ctrl+Space for suggestions in Google Docs
+  if (e.key === ' ' && e.ctrlKey && isShowingSuggestion) {
     e.preventDefault();
     e.stopPropagation();
     

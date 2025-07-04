@@ -29,7 +29,7 @@
 }
 
 .medcomplete-suggestion::after {
-  content: 'Tab to accept';
+  content: 'Ctrl+Space to accept';
   position: absolute;
   bottom: -20px;
   right: 0;
@@ -76,7 +76,7 @@
 }
 
 .medcomplete-suggestion.medcomplete-preview::after {
-  content: 'Tab again to accept';
+  content: 'Ctrl+Space again to accept';
   bottom: -22px;
   background-color: #3b82f6;
   color: white;

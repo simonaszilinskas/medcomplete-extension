@@ -7,6 +7,11 @@ let pendingRequest = null;
 let isGoogleDocs = false;
 let docsObserver = null;
 
+// Suggestion caching for performance
+let suggestionCache = new Map();
+const CACHE_MAX_SIZE = 20;
+const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
 // Detect all editable elements
 function findEditableElements() {
   const selectors = [
@@ -74,7 +79,17 @@ function handleBlur(e) {
 
 // Handle keydown events
 function handleKeyDown(e) {
-  console.log('[MedComplete] Key pressed:', e.key, 'isShowingSuggestion:', isShowingSuggestion);
+  console.log('[MedComplete] Key pressed:', e.key, 'Ctrl:', e.ctrlKey, 'isShowingSuggestion:', isShowingSuggestion);
+  
+  // Ctrl+Space for instant proactive suggestion
+  if (e.key === ' ' && e.ctrlKey && currentElement) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    console.log('[MedComplete] Ctrl+Space pressed - requesting instant suggestion');
+    requestInstantSuggestion();
+    return;
+  }
   
   // Tab for suggestions - but ONLY when suggestion is available
   if (e.key === 'Tab' && !e.shiftKey && currentElement && isShowingSuggestion && suggestionElement) {
@@ -138,10 +153,33 @@ function handleTyping() {
   // Hide current suggestion since user is typing
   hideSuggestion();
   
-  // Set new debounce timer
+  // Set new debounce timer - reduced for faster response
   debounceTimer = setTimeout(() => {
     checkForSuggestion();
-  }, 750); // 750ms delay
+  }, 400); // 400ms delay (reduced from 750ms)
+}
+
+// Request instant suggestion (triggered by Ctrl+Space)
+function requestInstantSuggestion() {
+  const context = getContext();
+  console.log('[MedComplete] Instant suggestion requested, context:', context);
+  
+  if (!context.trim()) {
+    console.log('[MedComplete] No context for instant suggestion');
+    return;
+  }
+  
+  // Cancel any pending automatic request
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
+  if (pendingRequest) {
+    pendingRequest = null;
+  }
+  
+  hideSuggestion();
+  lastProcessedText = context;
+  requestSuggestion();
 }
 
 // Check if we should request a suggestion
@@ -162,17 +200,58 @@ function checkForSuggestion() {
   const lastChar = context.slice(-1);
   const endsWithPunctuation = ['.', ':', ',', ';'].includes(lastChar);
   
-  console.log('[MedComplete] Trigger check - punctuation:', endsWithPunctuation, 'words:', words.length, 'chars:', context.length);
+  // Check for medical keywords to be more proactive
+  const medicalKeywords = ['patient', 'diagnosis', 'treatment', 'symptom', 'medication', 'history', 'exam', 'assessment', 'plan', 'follow'];
+  const containsMedicalKeyword = medicalKeywords.some(keyword => 
+    context.toLowerCase().includes(keyword)
+  );
   
-  // Trigger if:
+  console.log('[MedComplete] Trigger check - punctuation:', endsWithPunctuation, 'words:', words.length, 'chars:', context.length, 'medical:', containsMedicalKeyword);
+  
+  // More aggressive triggers for faster suggestions:
   // 1. Ends with punctuation, OR
-  // 2. Has at least 5 words, OR  
-  // 3. Has at least 20 characters (for shorter medical terms)
-  if (endsWithPunctuation || words.length >= 5 || context.length >= 20) {
+  // 2. Has at least 3 words (reduced from 5), OR  
+  // 3. Has at least 15 characters (reduced from 20), OR
+  // 4. Contains medical keywords and has at least 2 words
+  if (endsWithPunctuation || 
+      words.length >= 3 || 
+      context.length >= 15 || 
+      (containsMedicalKeyword && words.length >= 2)) {
     console.log('[MedComplete] Triggering suggestion request');
     lastProcessedText = context;
     requestSuggestion();
   }
+}
+
+// Helper function to manage suggestion cache
+function getCachedSuggestion(context) {
+  // Create cache key from last 50 characters for better matching
+  const cacheKey = context.slice(-50).toLowerCase().trim();
+  const cached = suggestionCache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY_MS) {
+    console.log('[MedComplete] Using cached suggestion for:', cacheKey);
+    return cached.suggestion;
+  }
+  
+  return null;
+}
+
+function cacheSuggestion(context, suggestion) {
+  const cacheKey = context.slice(-50).toLowerCase().trim();
+  
+  // Clean up old entries if cache is full
+  if (suggestionCache.size >= CACHE_MAX_SIZE) {
+    const oldestKey = suggestionCache.keys().next().value;
+    suggestionCache.delete(oldestKey);
+  }
+  
+  suggestionCache.set(cacheKey, {
+    suggestion: suggestion,
+    timestamp: Date.now()
+  });
+  
+  console.log('[MedComplete] Cached suggestion for:', cacheKey);
 }
 
 // Request suggestion from background script
@@ -181,6 +260,14 @@ async function requestSuggestion() {
   if (!context.trim()) return;
   
   console.log('[MedComplete] Requesting suggestion for context:', context);
+  
+  // Check cache first
+  const cachedSuggestion = getCachedSuggestion(context);
+  if (cachedSuggestion) {
+    showSuggestion(cachedSuggestion);
+    showProactiveIndicator();
+    return;
+  }
   
   try {
     // Store this as pending request
@@ -195,6 +282,10 @@ async function requestSuggestion() {
     // Only show if this is still the pending request (not cancelled)
     if (pendingRequest && response.suggestion) {
       console.log('[MedComplete] Showing suggestion:', response.suggestion);
+      
+      // Cache the suggestion
+      cacheSuggestion(context, response.suggestion);
+      
       showSuggestion(response.suggestion);
       showProactiveIndicator();
     } else if (response.error) {

@@ -19,9 +19,11 @@ AI-powered medical autocomplete Chrome extension for healthcare professionals.
 
 ## Triggers
 
-- After **750ms pause** in typing
+- After **400ms pause** in typing (optimized for speed)
 - When text ends with **punctuation** (. : , ;)
-- After **5+ words** or **20+ characters**
+- After **3+ words** or **15+ characters** (more responsive)
+- **Medical keywords** detected with 2+ words
+- **Ctrl+Space** for instant suggestions anytime
 
 ## Installation
 

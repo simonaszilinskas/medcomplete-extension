@@ -421,17 +421,43 @@ function checkGoogleDocsForSuggestion() {
 
 // Get text context from Google Docs
 function getGoogleDocsContext() {
-  // Try to get text from the current line and previous lines
-  const lines = document.querySelectorAll('.kix-lineview');
+  // Try multiple approaches to get text content
   let context = '';
   
-  // Get text from the last few lines (up to 100 characters)
-  for (let i = Math.max(0, lines.length - 3); i < lines.length; i++) {
-    const lineText = lines[i].textContent || '';
-    context += lineText + ' ';
+  // Method 1: Get text from current lines
+  const lines = document.querySelectorAll('.kix-lineview');
+  if (lines.length > 0) {
+    // Get text from the last few lines (up to 100 characters)
+    for (let i = Math.max(0, lines.length - 3); i < lines.length; i++) {
+      const lineText = lines[i].textContent || '';
+      context += lineText + ' ';
+    }
   }
   
-  // Return last 100 characters
+  // Method 2: Try getting text from cursor position if available
+  const selection = window.getSelection();
+  if (selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    if (range.startContainer && range.startContainer.textContent) {
+      const fullText = range.startContainer.textContent;
+      const cursorPos = range.startOffset;
+      const beforeCursor = fullText.substring(Math.max(0, cursorPos - 100), cursorPos);
+      if (beforeCursor.length > context.length) {
+        context = beforeCursor;
+      }
+    }
+  }
+  
+  // Method 3: Fallback to document body text (last resort)
+  if (!context.trim()) {
+    const docsContent = document.querySelector('.kix-page-content-wrapper');
+    if (docsContent) {
+      const text = docsContent.textContent || '';
+      context = text.slice(-100);
+    }
+  }
+  
+  // Return last 100 characters, trimmed
   return context.slice(-100).trim();
 }
 
@@ -446,43 +472,80 @@ async function acceptGoogleDocsSuggestion() {
     // Copy suggestion to clipboard
     await navigator.clipboard.writeText(suggestion);
     
-    // Simulate Ctrl+V to paste
-    document.execCommand('paste');
+    // Try direct paste command first
+    const pasteSuccess = document.execCommand('paste');
+    console.log('[MedComplete] execCommand paste result:', pasteSuccess);
+    
+    if (!pasteSuccess) {
+      // Try creating a proper ClipboardEvent with data
+      const clipboardData = new DataTransfer();
+      clipboardData.setData('text/plain', suggestion);
+      
+      const pasteEvent = new ClipboardEvent('paste', {
+        clipboardData: clipboardData,
+        bubbles: true,
+        cancelable: true
+      });
+      
+      // Dispatch to focused element and document
+      const activeElement = document.activeElement;
+      if (activeElement) {
+        activeElement.dispatchEvent(pasteEvent);
+      }
+      document.dispatchEvent(pasteEvent);
+      
+      // Also try simulating Ctrl+V
+      const keyDownEvent = new KeyboardEvent('keydown', {
+        key: 'v',
+        code: 'KeyV',
+        ctrlKey: true,
+        bubbles: true
+      });
+      
+      const keyUpEvent = new KeyboardEvent('keyup', {
+        key: 'v',
+        code: 'KeyV',
+        ctrlKey: true,
+        bubbles: true
+      });
+      
+      document.dispatchEvent(keyDownEvent);
+      document.dispatchEvent(keyUpEvent);
+    }
     
     hideSuggestion();
+    
+    // Show success message with fallback instruction
+    showGoogleDocsMessage(
+      'Suggestion ready! If text didn\'t appear automatically, press Ctrl+V to paste.',
+      'success'
+    );
+    
   } catch (error) {
     console.error('[MedComplete] Failed to insert text in Google Docs:', error);
+    
     // Fallback: show instruction to user
-    showGoogleDocsInstructions(suggestion);
+    showGoogleDocsMessage(
+      `Text copied to clipboard: "${suggestion}". Press Ctrl+V to paste.`, 
+      'info'
+    );
   }
 }
 
-// Show notification for unsupported sites
-function showUnsupportedSiteNotification() {
+// Show message to user in Google Docs
+function showGoogleDocsMessage(message, type = 'info') {
   const notification = document.createElement('div');
-  notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #ef4444;
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 999999;
-    animation: slideIn 0.3s ease-out;
-  `;
-  notification.textContent = 'MedComplete: Google Docs is not supported. Try in standard text fields or other medical platforms.';
+  notification.className = `medcomplete-google-docs-notification ${type}`;
+  notification.textContent = message;
   
   document.body.appendChild(notification);
   
   setTimeout(() => {
     notification.style.animation = 'slideOut 0.3s ease-out';
     setTimeout(() => notification.remove(), 300);
-  }, 5000);
+  }, 4000);
 }
+
 
 // Start when DOM is ready
 if (document.readyState === 'loading') {

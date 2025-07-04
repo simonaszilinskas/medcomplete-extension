@@ -4,18 +4,19 @@ AI-powered medical autocomplete Chrome extension for healthcare professionals.
 
 ## Features
 
-- **Real-time AI suggestions** - Powered by Gemma via OpenRouter - soon to be powered by MedGemma via Vertex AI. 
-- **Proactive indicators** - Shows "Tab" button when suggestions are available.
-- **Two-step acceptance** - Tab to preview, Tab again to accept. 
-- **Medical-focused** - Prompts for medical documentation.
+- **Real-time AI suggestions** - Powered by Mistral via OpenRouter
+- **Proactive suggestions** - Automatically appears when available
+- **Simple acceptance** - Tab to accept suggestions immediately
+- **Medical-focused** - Optimized prompts for medical documentation
+- **Google Docs support** - Works in Google Docs via clipboard integration
 
 ## How it Works
 
-1. Start typing medical text in any text field
+1. Start typing medical text in any text field or Google Docs
 2. Extension automatically detects completion opportunities
-3. Blue "Tab" indicator appears when suggestion is ready
-4. Press Tab once to preview the suggestion
-5. Press Tab again to accept and insert the text
+3. Suggestion appears automatically when ready
+4. Press Tab to accept and insert the text
+5. In Google Docs, text is inserted via clipboard (press Ctrl+V if needed)
 
 ## Triggers
 
@@ -50,7 +51,7 @@ medcomplete/
 ## Development
 
 ### API Configuration
-The extension uses OpenRouter's Gemma model for now - at term it shall use MedGemma powered by Vertex AI. The API key is in user settings.
+The extension uses OpenRouter's Mistral model with secure API key storage in user settings. Future versions will integrate MedGemma via Vertex AI.
 
 ### Key Components
 

@@ -289,6 +289,123 @@ function hideSuggestion() {
   lastProcessedText = ''; // Reset so we can suggest again
 }
 
+// Helper function to get cursor position in contenteditable elements
+function getContentEditableCursorPosition(element, range) {
+  const preCaretRange = range.cloneRange();
+  preCaretRange.selectNodeContents(element);
+  preCaretRange.setEnd(range.startContainer, range.startOffset);
+  return preCaretRange.toString().length;
+}
+
+// Smart suggestion processing - handles spacing, periods, and text overlap
+function processSuggestion(rawSuggestion, currentText, cursorPosition) {
+  console.log('[MedComplete] Processing suggestion:', rawSuggestion);
+  console.log('[MedComplete] Current text context:', currentText.substring(Math.max(0, cursorPosition - 50), cursorPosition + 50));
+  
+  let suggestion = rawSuggestion;
+  
+  // Get text before and after cursor
+  const beforeCursor = currentText.substring(0, cursorPosition);
+  const afterCursor = currentText.substring(cursorPosition);
+  
+  // Remove leading space if previous character is already a space or punctuation
+  if (suggestion.startsWith(' ')) {
+    const lastChar = beforeCursor.slice(-1);
+    if (lastChar === ' ' || lastChar === '' || /[.,:;!?]/.test(lastChar)) {
+      suggestion = suggestion.substring(1);
+      console.log('[MedComplete] Removed unnecessary leading space');
+    }
+  }
+  
+  // Remove leading "..." if not needed
+  if (suggestion.startsWith('...')) {
+    const lastChars = beforeCursor.slice(-3);
+    if (lastChars === '...' || beforeCursor.trim() === '') {
+      suggestion = suggestion.substring(3);
+      console.log('[MedComplete] Removed unnecessary leading ellipsis');
+    }
+  }
+  
+  // Handle text overlap - find the longest overlap between end of current text and start of suggestion
+  const wordsBeforeCursor = beforeCursor.trim().split(/\s+/).filter(word => word.length > 0).slice(-10); // Last 10 words
+  let maxOverlap = 0;
+  let overlapIndex = 0;
+  
+  // Try to find overlap starting from suggestion beginning
+  for (let i = 1; i <= Math.min(wordsBeforeCursor.length, 8); i++) {
+    const endWords = wordsBeforeCursor.slice(-i).join(' ').toLowerCase().trim();
+    const suggestionStart = suggestion.toLowerCase().trim();
+    
+    if (endWords.length > 2 && suggestionStart.startsWith(endWords)) {
+      if (endWords.length > maxOverlap) {
+        maxOverlap = endWords.length;
+        overlapIndex = i;
+      }
+    }
+  }
+  
+  // Also check for partial word overlap (common with medical terms)
+  if (maxOverlap === 0 && wordsBeforeCursor.length > 0) {
+    const lastWord = wordsBeforeCursor[wordsBeforeCursor.length - 1].toLowerCase();
+    const suggestionLower = suggestion.toLowerCase().trim();
+    
+    // Check if suggestion starts with a word that partially matches the last word
+    const suggestionWords = suggestionLower.split(/\s+/);
+    if (suggestionWords.length > 0) {
+      const firstSuggestionWord = suggestionWords[0];
+      
+      // If last word is a prefix of first suggestion word, remove the overlap
+      if (firstSuggestionWord.length > lastWord.length && 
+          firstSuggestionWord.startsWith(lastWord) && 
+          lastWord.length > 2) {
+        const remainingPart = firstSuggestionWord.substring(lastWord.length);
+        suggestion = remainingPart + suggestion.substring(firstSuggestionWord.length);
+        console.log('[MedComplete] Merged partial word overlap:', lastWord, '->', firstSuggestionWord);
+      }
+    }
+  }
+  
+  // If we found complete word overlap, remove the duplicated part from suggestion
+  if (maxOverlap > 0) {
+    const overlapWords = wordsBeforeCursor.slice(-overlapIndex);
+    const overlapText = overlapWords.join(' ');
+    
+    // Find the exact overlap and remove it from suggestion
+    const suggestionLower = suggestion.toLowerCase();
+    const overlapLower = overlapText.toLowerCase();
+    
+    if (suggestionLower.startsWith(overlapLower)) {
+      suggestion = suggestion.substring(overlapText.length);
+      // Remove leading space if any
+      if (suggestion.startsWith(' ')) {
+        suggestion = suggestion.substring(1);
+      }
+      console.log('[MedComplete] Removed overlapping text:', overlapText);
+    }
+  }
+  
+  // Ensure proper spacing if suggestion doesn't start with punctuation
+  if (suggestion && !suggestion.startsWith(' ') && !/^[.,:;!?]/.test(suggestion)) {
+    const lastChar = beforeCursor.slice(-1);
+    if (lastChar && lastChar !== ' ' && !/[.,:;!?]/.test(lastChar)) {
+      suggestion = ' ' + suggestion;
+      console.log('[MedComplete] Added necessary space before suggestion');
+    }
+  }
+  
+  // Clean up multiple spaces
+  suggestion = suggestion.replace(/\s{2,}/g, ' ');
+  
+  // Handle case where suggestion might be empty after processing
+  if (!suggestion.trim()) {
+    console.log('[MedComplete] Suggestion became empty after processing, using original');
+    return rawSuggestion;
+  }
+  
+  console.log('[MedComplete] Processed suggestion:', suggestion);
+  return suggestion;
+}
+
 // Accept and insert suggestion
 function acceptSuggestion() {
   if (!suggestionElement || !currentElement) {
@@ -296,8 +413,8 @@ function acceptSuggestion() {
     return;
   }
   
-  const suggestion = suggestionElement.dataset.suggestion || suggestionElement.textContent;
-  console.log('[MedComplete] Accepting suggestion:', suggestion, 'into element:', currentElement.tagName, currentElement.className);
+  const rawSuggestion = suggestionElement.dataset.suggestion || suggestionElement.textContent;
+  console.log('[MedComplete] Raw suggestion:', rawSuggestion, 'into element:', currentElement.tagName, currentElement.className);
   
   // Ensure the element is still focused
   if (document.activeElement !== currentElement) {
@@ -305,27 +422,41 @@ function acceptSuggestion() {
     currentElement.focus();
   }
   
+  let processedSuggestion;
+  let cursorPosition;
+  let fullText;
+  
   if (currentElement.tagName === 'TEXTAREA' || currentElement.tagName === 'INPUT') {
+    cursorPosition = currentElement.selectionStart;
+    fullText = currentElement.value;
+    processedSuggestion = processSuggestion(rawSuggestion, fullText, cursorPosition);
+    
     const start = currentElement.selectionStart;
     const end = currentElement.selectionEnd;
-    const text = currentElement.value;
     
-    currentElement.value = text.substring(0, start) + suggestion + text.substring(end);
-    currentElement.selectionStart = currentElement.selectionEnd = start + suggestion.length;
+    currentElement.value = fullText.substring(0, start) + processedSuggestion + fullText.substring(end);
+    currentElement.selectionStart = currentElement.selectionEnd = start + processedSuggestion.length;
     
     // Trigger input event for frameworks
     currentElement.dispatchEvent(new Event('input', { bubbles: true }));
   } else if (currentElement.contentEditable === 'true') {
-    // For contenteditable elements (like Gmail), try multiple approaches
+    // For contenteditable elements (like Gmail), get text and cursor position
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
+      
+      // Get full text and cursor position for processing
+      fullText = currentElement.textContent || '';
+      cursorPosition = getContentEditableCursorPosition(currentElement, range);
+      processedSuggestion = processSuggestion(rawSuggestion, fullText, cursorPosition);
+      
       range.deleteContents();
-      range.insertNode(document.createTextNode(suggestion));
+      range.insertNode(document.createTextNode(processedSuggestion));
       range.collapse(false);
     } else {
-      // Fallback to execCommand
-      document.execCommand('insertText', false, suggestion);
+      // Fallback - just use raw suggestion with execCommand
+      processedSuggestion = rawSuggestion;
+      document.execCommand('insertText', false, processedSuggestion);
     }
     
     // Trigger input event for Gmail

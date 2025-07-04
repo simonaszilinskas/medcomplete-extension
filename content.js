@@ -12,6 +12,9 @@ let suggestionCache = new Map();
 const CACHE_MAX_SIZE = 20;
 const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
+// Track extension context state
+let extensionContextValid = true;
+
 // Detect all editable elements
 function findEditableElements() {
   const selectors = [
@@ -246,6 +249,12 @@ function cacheSuggestion(context, suggestion) {
 
 // Request suggestion from background script
 async function requestSuggestion() {
+  // Skip if extension context is invalid
+  if (!extensionContextValid) {
+    console.warn('[MedComplete] Extension context invalid - skipping suggestion request');
+    return;
+  }
+  
   const context = getContext();
   if (!context.trim()) return;
   
@@ -260,6 +269,12 @@ async function requestSuggestion() {
   }
   
   try {
+    // Check if chrome.runtime is available (extension context is valid)
+    if (!chrome.runtime || !chrome.runtime.sendMessage) {
+      console.warn('[MedComplete] Extension context invalidated - skipping suggestion request');
+      return;
+    }
+    
     // Store this as pending request
     pendingRequest = chrome.runtime.sendMessage({
       action: 'getSuggestion',
@@ -270,7 +285,7 @@ async function requestSuggestion() {
     console.log('[MedComplete] Received response:', response);
     
     // Only show if this is still the pending request (not cancelled)
-    if (pendingRequest && response.suggestion) {
+    if (pendingRequest && response && response.suggestion) {
       console.log('[MedComplete] Showing suggestion:', response.suggestion);
       
       // Cache the suggestion
@@ -278,11 +293,22 @@ async function requestSuggestion() {
       
       showSuggestion(response.suggestion);
       showProactiveIndicator();
-    } else if (response.error) {
+    } else if (response && response.error) {
       console.error('[MedComplete] Error from background:', response.error);
     }
   } catch (error) {
-    console.error('[MedComplete] Error getting suggestion:', error);
+    // Handle extension context invalidation gracefully
+    if (error.message && error.message.includes('Extension context invalidated')) {
+      console.warn('[MedComplete] Extension was reloaded - please refresh the page to continue using MedComplete');
+      
+      // Mark context as invalid to prevent further requests
+      extensionContextValid = false;
+      
+      // Show user-friendly notification
+      showContextInvalidatedNotification();
+    } else {
+      console.error('[MedComplete] Error getting suggestion:', error);
+    }
   } finally {
     pendingRequest = null;
   }
@@ -789,6 +815,25 @@ function showGoogleDocsMessage(message, type = 'info') {
     notification.style.animation = 'slideOut 0.3s ease-out';
     setTimeout(() => notification.remove(), 300);
   }, 4000);
+}
+
+// Show notification when extension context is invalidated
+function showContextInvalidatedNotification() {
+  const notification = document.createElement('div');
+  notification.className = 'medcomplete-google-docs-notification error';
+  notification.innerHTML = `
+    <strong>MedComplete:</strong> Extension was reloaded. 
+    <br>Please refresh this page to continue using suggestions.
+    <br><small>Press F5 or Ctrl+R</small>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Keep this notification longer since it requires user action
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.3s ease-out';
+    setTimeout(() => notification.remove(), 300);
+  }, 10000); // 10 seconds instead of 4
 }
 
 

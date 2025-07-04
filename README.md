@@ -8,15 +8,14 @@ AI-powered medical autocomplete Chrome extension for healthcare professionals.
 - **Proactive suggestions** - Automatically appears when available
 - **Simple acceptance** - Tab to accept suggestions immediately
 - **Medical-focused** - Optimized prompts for medical documentation
-- **Google Docs support** - Works in Google Docs via clipboard integration
+- **Wide compatibility** - Works on most web forms and text fields
 
 ## How it Works
 
-1. Start typing medical text in any text field or Google Docs
+1. Start typing medical text in any text field
 2. Extension automatically detects completion opportunities
 3. Suggestion appears automatically when ready
 4. Press Tab to accept and insert the text
-5. In Google Docs, text is inserted via clipboard (press Ctrl+V if needed)
 
 ## Triggers
 

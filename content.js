@@ -311,11 +311,9 @@ const observer = new MutationObserver(() => {
 function init() {
   console.log('[MedComplete] Initializing extension...');
   
-  // Check for Google Docs
+  // Skip Google Docs for now
   if (window.location.hostname === 'docs.google.com') {
-    console.log('[MedComplete] Detected Google Docs - using specialized handling');
-    isGoogleDocs = true;
-    initGoogleDocs();
+    console.log('[MedComplete] Google Docs detected - not supported yet');
     return;
   }
   

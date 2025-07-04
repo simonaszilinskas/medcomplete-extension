@@ -424,13 +424,23 @@ function processSuggestion(rawSuggestion, currentText, cursorPosition) {
     }
   }
   
-  // Remove leading "..." if not needed
+  // Remove leading "..." and similar AI continuation markers
   if (suggestion.startsWith('...')) {
-    const lastChars = beforeCursor.slice(-3);
-    if (lastChars === '...' || beforeCursor.trim() === '') {
-      suggestion = suggestion.substring(3);
-      console.log('[MedComplete] Removed unnecessary leading ellipsis');
+    suggestion = suggestion.substring(3);
+    // Remove any space that follows the dots
+    if (suggestion.startsWith(' ')) {
+      suggestion = suggestion.substring(1);
     }
+    console.log('[MedComplete] Removed leading ellipsis');
+  }
+  
+  // Also handle other AI continuation patterns
+  if (suggestion.startsWith('..')) {
+    suggestion = suggestion.substring(2);
+    if (suggestion.startsWith(' ')) {
+      suggestion = suggestion.substring(1);
+    }
+    console.log('[MedComplete] Removed leading double dots');
   }
   
   // Handle text overlap - find the longest overlap between end of current text and start of suggestion

@@ -68,7 +68,11 @@ async function getSuggestion(context) {
     // Create a medical-focused prompt for completion
     const prompt = `You are a medical documentation assistant. Continue the following medical text naturally. 
 
-IMPORTANT: Only provide what comes AFTER the given text. Do not rewrite or repeat any part of the existing text. Just continue from where it ends.
+IMPORTANT: 
+- Only provide what comes AFTER the given text
+- Do not rewrite or repeat any part of the existing text
+- Do not start with "..." or ".." or any dots
+- Just continue from where the text ends naturally
 
 Text: "${context}"
 
@@ -135,6 +139,8 @@ Continuation (max 15 words):`;
       completion = completion.replace(/^["']|["']$/g, ''); // Remove quotes
       completion = completion.replace(/^Continuation:\s*/i, ''); // Remove "Continuation:" prefix
       completion = completion.replace(/^Completion:\s*/i, ''); // Remove "Completion:" prefix
+      completion = completion.replace(/^\.{2,}\s*/, ''); // Remove leading dots (2 or more)
+      completion = completion.replace(/^\.\s*/, ''); // Remove single leading dot
       
       // Ensure it starts with a space if needed
       if (completion && !completion.startsWith(' ') && !context.endsWith(' ')) {

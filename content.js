@@ -19,6 +19,15 @@ function findEditableElements() {
     '[contenteditable=""]'
   ];
   
+  // Add Gmail-specific selectors
+  if (window.location.hostname.includes('mail.google.com')) {
+    selectors.push(
+      '[contenteditable="true"][aria-label*="Message Body"]',
+      '[role="textbox"]',
+      '.Am.Al.editable'
+    );
+  }
+  
   // Check if we're on Google Docs
   if (window.location.hostname === 'docs.google.com') {
     console.log('[MedComplete] Detected Google Docs - adding special handling');
@@ -43,7 +52,7 @@ function attachListeners() {
     if (!element.hasAttribute('data-medcomplete-attached')) {
       element.setAttribute('data-medcomplete-attached', 'true');
       
-      element.addEventListener('keydown', handleKeyDown);
+      element.addEventListener('keydown', handleKeyDown, true); // Use capture mode
       element.addEventListener('focus', handleFocus);
       element.addEventListener('blur', handleBlur);
     }
@@ -70,6 +79,8 @@ function handleKeyDown(e) {
   // Tab for suggestions - but ONLY when suggestion is available
   if (e.key === 'Tab' && !e.shiftKey && currentElement && isShowingSuggestion && suggestionElement) {
     e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
     console.log('[MedComplete] Tab pressed with suggestion available - accepting immediately');
     acceptSuggestion();
   } else if (e.key === 'Escape' && isShowingSuggestion) {
@@ -280,10 +291,19 @@ function hideSuggestion() {
 
 // Accept and insert suggestion
 function acceptSuggestion() {
-  if (!suggestionElement || !currentElement) return;
+  if (!suggestionElement || !currentElement) {
+    console.log('[MedComplete] Cannot accept suggestion - missing element');
+    return;
+  }
   
   const suggestion = suggestionElement.dataset.suggestion || suggestionElement.textContent;
-  console.log('[MedComplete] Accepting suggestion:', suggestion);
+  console.log('[MedComplete] Accepting suggestion:', suggestion, 'into element:', currentElement.tagName, currentElement.className);
+  
+  // Ensure the element is still focused
+  if (document.activeElement !== currentElement) {
+    console.log('[MedComplete] Refocusing element before insertion');
+    currentElement.focus();
+  }
   
   if (currentElement.tagName === 'TEXTAREA' || currentElement.tagName === 'INPUT') {
     const start = currentElement.selectionStart;
@@ -296,10 +316,25 @@ function acceptSuggestion() {
     // Trigger input event for frameworks
     currentElement.dispatchEvent(new Event('input', { bubbles: true }));
   } else if (currentElement.contentEditable === 'true') {
-    document.execCommand('insertText', false, suggestion);
+    // For contenteditable elements (like Gmail), try multiple approaches
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(document.createTextNode(suggestion));
+      range.collapse(false);
+    } else {
+      // Fallback to execCommand
+      document.execCommand('insertText', false, suggestion);
+    }
+    
+    // Trigger input event for Gmail
+    currentElement.dispatchEvent(new Event('input', { bubbles: true }));
+    currentElement.dispatchEvent(new Event('change', { bubbles: true }));
   }
   
   hideSuggestion();
+  console.log('[MedComplete] Suggestion accepted successfully');
 }
 
 // Monitor DOM changes for dynamic content

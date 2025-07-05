@@ -191,9 +191,9 @@
     
     <div class="setting-item" id="ollama-settings" style="display: none;">
       <label for="ollamaUrl">Ollama API URL</label>
-      <input type="text" id="ollamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434">
+      <input type="text" id="ollamaUrl" placeholder="http://127.0.0.1:11434" value="http://127.0.0.1:11434">
       <div class="help-text">
-        Enter your Ollama API URL. Default is http://localhost:11434 for local installation.
+        Enter your Ollama API URL. Default is http://127.0.0.1:11434 for local installation.
         <br><strong>Setup:</strong> 
         <br>1. Install Ollama: <a href="https://ollama.ai/" target="_blank" class="api-key-link">ollama.ai</a>
         <br>2. Enable CORS: Set environment variable <code>OLLAMA_ORIGINS=chrome-extension://*</code>
@@ -202,14 +202,15 @@
       </div>
       
       <label for="ollamaModel" style="margin-top: 15px;">Model Name</label>
-      <input type="text" id="ollamaModel" placeholder="medgemma-4b-it" value="medgemma-4b-it">
+      <input type="text" id="ollamaModel" placeholder="hf.co/unsloth/medgemma-4b-it-GGUF:latest" value="hf.co/unsloth/medgemma-4b-it-GGUF:latest">
       <div class="help-text">
         Model name as it appears in Ollama. Use <code>ollama list</code> to see available models.
         <br><strong>Recommended:</strong> medgemma-4b-it (download with command above)
         <br><strong>Troubleshooting 403 error:</strong>
-        <br>• macOS/Linux: <code>OLLAMA_ORIGINS=chrome-extension://* ollama serve</code>
-        <br>• Windows: <code>set OLLAMA_ORIGINS=chrome-extension://* && ollama serve</code>
-        <br>• Or restart Ollama after setting the environment variable
+        <br>• Set CORS: <code>OLLAMA_ORIGINS=chrome-extension://* ollama serve</code>
+        <br>• Use full model name from <code>ollama list</code> (e.g., with :latest suffix)
+        <br>• If still failing, try IP address: <code>http://127.0.0.1:11434</code>
+        <br>• Chrome may block localhost - restart browser after Ollama setup
       </div>
       
       <button type="button" id="testOllama" class="save-btn" style="margin-top: 10px;">Test Ollama Connection</button>

@@ -11,6 +11,7 @@
   "host_permissions": [
     "https://*/*",
     "http://*/*",
+    "http://localhost:*/*",
     "https://openrouter.ai/*"
   ],
   "background": {

@@ -15,6 +15,8 @@ async function loadSettings() {
     'medgemmaApiUrl',
     'vertexEndpoint',
     'vertexToken',
+    'ollamaUrl',
+    'ollamaModel',
     'selectedModel',
     'maxTokens',
     'temperature',
@@ -41,6 +43,14 @@ async function loadSettings() {
   
   if (result.vertexToken) {
     document.getElementById('vertexToken').value = result.vertexToken;
+  }
+  
+  if (result.ollamaUrl) {
+    document.getElementById('ollamaUrl').value = result.ollamaUrl;
+  }
+  
+  if (result.ollamaModel) {
+    document.getElementById('ollamaModel').value = result.ollamaModel;
   }
   
   if (result.selectedModel) {
@@ -70,18 +80,22 @@ function updateProviderUI(provider) {
   const openrouterSettings = document.getElementById('openrouter-settings');
   const medgemmaSettings = document.getElementById('medgemma-settings');
   const vertexSettings = document.getElementById('vertex-settings');
+  const ollamaSettings = document.getElementById('ollama-settings');
   const modelSettings = document.getElementById('model-settings');
   
   // Hide all provider-specific settings first
   openrouterSettings.style.display = 'none';
   medgemmaSettings.style.display = 'none';
   vertexSettings.style.display = 'none';
+  ollamaSettings.style.display = 'none';
   modelSettings.style.display = 'none';
   
   if (provider === 'medgemma') {
     medgemmaSettings.style.display = 'block';
   } else if (provider === 'medgemma-vertex') {
     vertexSettings.style.display = 'block';
+  } else if (provider === 'ollama-local') {
+    ollamaSettings.style.display = 'block';
   } else {
     openrouterSettings.style.display = 'block';
     modelSettings.style.display = 'block';
@@ -95,6 +109,8 @@ async function saveSettings() {
   const medgemmaUrl = document.getElementById('medgemmaUrl').value.trim();
   const vertexEndpoint = document.getElementById('vertexEndpoint').value.trim();
   const vertexToken = document.getElementById('vertexToken').value.trim();
+  const ollamaUrl = document.getElementById('ollamaUrl').value.trim();
+  const ollamaModel = document.getElementById('ollamaModel').value.trim();
   const model = document.getElementById('model').value;
   const maxTokens = parseInt(document.getElementById('maxTokens').value);
   const temperature = parseFloat(document.getElementById('temperature').value);
@@ -144,6 +160,21 @@ async function saveSettings() {
       showStatus('error', 'Access token should start with "ya29." (Google Cloud access token format)');
       return;
     }
+  } else if (apiProvider === 'ollama-local') {
+    if (!ollamaUrl) {
+      showStatus('error', 'Please enter your Ollama API URL');
+      return;
+    }
+    
+    if (!ollamaUrl.startsWith('http://') && !ollamaUrl.startsWith('https://')) {
+      showStatus('error', 'Ollama URL must start with http:// or https://');
+      return;
+    }
+    
+    if (!ollamaModel) {
+      showStatus('error', 'Please enter the Ollama model name');
+      return;
+    }
   }
   
   // Validate AI behavior settings
@@ -178,6 +209,9 @@ async function saveSettings() {
     } else if (apiProvider === 'medgemma-vertex') {
       settingsToSave.vertexEndpoint = vertexEndpoint;
       settingsToSave.vertexToken = vertexToken;
+    } else if (apiProvider === 'ollama-local') {
+      settingsToSave.ollamaUrl = ollamaUrl;
+      settingsToSave.ollamaModel = ollamaModel;
     }
     
     await chrome.storage.local.set(settingsToSave);
@@ -191,6 +225,8 @@ async function saveSettings() {
       testMedGemmaApi(medgemmaUrl);
     } else if (apiProvider === 'medgemma-vertex') {
       testVertexApi(vertexEndpoint, vertexToken);
+    } else if (apiProvider === 'ollama-local') {
+      testOllamaApi(ollamaUrl, ollamaModel);
     }
     
   } catch (error) {
@@ -258,6 +294,72 @@ async function testMedGemmaApi(medgemmaUrl) {
     }
   } catch (error) {
     showStatus('error', `MedGemma API test failed: ${error.message}. Check if the URL is correct and accessible.`);
+  }
+}
+
+// Test Ollama API
+async function testOllamaApi(ollamaUrl, model) {
+  try {
+    showStatus('info', 'Testing Ollama connection...');
+    
+    // First, test if Ollama is running by checking the API endpoint
+    const healthResponse = await fetch(`${ollamaUrl}/api/tags`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!healthResponse.ok) {
+      if (healthResponse.status === 403) {
+        showStatus('error', `CORS error (403). Enable CORS by setting OLLAMA_ORIGINS=chrome-extension://* and restart Ollama. See setup instructions above.`);
+      } else {
+        showStatus('error', `Ollama server not responding: ${healthResponse.status}. Make sure Ollama is running.`);
+      }
+      return;
+    }
+    
+    const tagsData = await healthResponse.json();
+    console.log('Ollama available models:', tagsData);
+    
+    // Check if the specified model is available
+    const modelExists = tagsData.models && tagsData.models.some(m => m.name.includes(model));
+    
+    if (!modelExists) {
+      showStatus('error', `Model "${model}" not found. Available models: ${tagsData.models?.map(m => m.name).join(', ') || 'none'}. Run: ollama run hf.co/unsloth/medgemma-4b-it-GGUF`);
+      return;
+    }
+    
+    // Test generation with the model
+    const testResponse = await fetch(`${ollamaUrl}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        prompt: 'Test',
+        stream: false,
+        options: {
+          num_predict: 5
+        }
+      })
+    });
+    
+    if (testResponse.ok) {
+      const result = await testResponse.json();
+      showStatus('success', `Ollama API validated successfully! Model "${model}" is ready. Generated: "${result.response?.trim()?.substring(0, 50) || 'response received'}"`);
+    } else {
+      const errorText = await testResponse.text();
+      if (testResponse.status === 403) {
+        showStatus('error', `CORS error (403) during generation. Make sure OLLAMA_ORIGINS=chrome-extension://* is set and Ollama is restarted.`);
+      } else {
+        showStatus('error', `Ollama generation test failed: ${testResponse.status} - ${errorText}`);
+      }
+    }
+    
+  } catch (error) {
+    showStatus('error', `Ollama API test failed: ${error.message}. Make sure Ollama is running on ${ollamaUrl}`);
   }
 }
 
@@ -456,4 +558,28 @@ document.getElementById('vertexToken').addEventListener('focus', (e) => {
 
 document.getElementById('vertexToken').addEventListener('blur', (e) => {
   e.target.type = 'password';
+});
+
+// Ollama URL enter key
+document.getElementById('ollamaUrl').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    saveSettings();
+  }
+});
+
+document.getElementById('ollamaModel').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    saveSettings();
+  }
+});
+
+// Ollama test button
+document.getElementById('testOllama').addEventListener('click', () => {
+  const url = document.getElementById('ollamaUrl').value.trim();
+  const model = document.getElementById('ollamaModel').value.trim();
+  if (url && model) {
+    testOllamaApi(url, model);
+  } else {
+    showStatus('error', 'Please enter both Ollama URL and model name');
+  }
 });

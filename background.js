@@ -19,6 +19,8 @@ async function getApiConfig() {
     'medgemmaApiUrl',
     'vertexEndpoint',
     'vertexToken',
+    'ollamaUrl',
+    'ollamaModel',
     'selectedModel',
     'maxTokens',
     'temperature',
@@ -32,6 +34,8 @@ async function getApiConfig() {
     medgemmaUrl: result.medgemmaApiUrl,
     vertexEndpoint: result.vertexEndpoint,
     vertexToken: result.vertexToken,
+    ollamaUrl: result.ollamaUrl || 'http://localhost:11434',
+    ollamaModel: result.ollamaModel || 'medgemma-4b-it',
     model: result.selectedModel || DEFAULT_MODEL,
     maxTokens: result.maxTokens || 25,
     temperature: result.temperature || 0.3,
@@ -54,6 +58,8 @@ function getPrompt(config) {
     medgemmaUrlPresent: !!config.medgemmaUrl,
     vertexEndpointPresent: !!config.vertexEndpoint,
     vertexTokenPresent: !!config.vertexToken,
+    ollamaUrl: config.ollamaUrl,
+    ollamaModel: config.ollamaModel,
     model: config.model
   });
 })();
@@ -92,6 +98,8 @@ async function getSuggestion(context) {
       return await getMedGemmaSuggestion(context, config);
     } else if (config.provider === 'medgemma-vertex') {
       return await getVertexSuggestion(context, config);
+    } else if (config.provider === 'ollama-local') {
+      return await getOllamaSuggestion(context, config);
     } else {
       return await getOpenRouterSuggestion(context, config);
     }
@@ -337,6 +345,81 @@ async function getVertexSuggestion(context, config) {
     
   } catch (error) {
     console.error('[MedComplete Background] Vertex AI error:', error);
+    throw error;
+  }
+}
+
+// Ollama Local API implementation
+async function getOllamaSuggestion(context, config) {
+  if (!config.ollamaUrl) {
+    throw new Error('No Ollama URL configured. Please set your Ollama URL in the extension settings.');
+  }
+  
+  if (!config.ollamaModel) {
+    throw new Error('No Ollama model configured. Please set your model name in the extension settings.');
+  }
+  
+  const prefixedContext = config.userPrefix ? `${config.userPrefix} ${context}` : context;
+  const systemPrompt = getPrompt(config);
+  
+  try {
+    console.log('[MedComplete Background] Calling Ollama API:', config.ollamaUrl);
+    console.log('[MedComplete Background] Using model:', config.ollamaModel);
+    
+    const prompt = `${systemPrompt}\n\nText: "${prefixedContext}"\n\nContinuation (max ${config.maxTokens} words):`;
+    
+    const response = await fetch(`${config.ollamaUrl}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: config.ollamaModel,
+        prompt: prompt,
+        stream: false,
+        options: {
+          num_predict: Math.min(config.maxTokens * 2, 100),
+          temperature: config.temperature,
+          top_p: 0.9,
+          stop: ['\n\n', 'Text:', 'Continuation:']
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error(`Ollama CORS error (403). Please set OLLAMA_ORIGINS=chrome-extension://* and restart Ollama.`);
+      } else {
+        throw new Error(`Ollama request failed: ${response.status} ${response.statusText}`);
+      }
+    }
+    
+    const data = await response.json();
+    console.log('[MedComplete Background] Ollama response:', data);
+    
+    if (data.response) {
+      let completion = data.response.trim();
+      
+      // Clean up the completion
+      completion = completion.replace(/^[\"']|[\"']$/g, ''); // Remove quotes
+      completion = completion.replace(/^Continuation:\s*/i, ''); // Remove "Continuation:" prefix
+      completion = completion.replace(/^Completion:\s*/i, ''); // Remove "Completion:" prefix
+      completion = completion.replace(/^\.{2,}\s*/, ''); // Remove leading dots (2 or more)
+      completion = completion.replace(/^\.\s*/, ''); // Remove single leading dot
+      
+      // Ensure it starts with a space if needed
+      if (completion && !completion.startsWith(' ') && !context.endsWith(' ')) {
+        completion = ' ' + completion;
+      }
+      
+      console.log('[MedComplete Background] Final Ollama completion:', completion);
+      return completion;
+    }
+    
+    throw new Error('Invalid Ollama response format - no response found');
+    
+  } catch (error) {
+    console.error('[MedComplete Background] Ollama error:', error);
     throw error;
   }
 }

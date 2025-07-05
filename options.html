@@ -119,6 +119,15 @@
     .api-key-link:hover {
       text-decoration: underline;
     }
+    
+    code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 13px;
+      color: #1e293b;
+    }
   </style>
 </head>
 <body>
@@ -140,9 +149,10 @@
         <option value="openrouter">OpenRouter (Multiple Models)</option>
         <option value="medgemma">MedGemma (Gradio)</option>
         <option value="medgemma-vertex">MedGemma (Vertex AI)</option>
+        <option value="ollama-local">Ollama (Local)</option>
       </select>
       <div class="help-text">
-        Choose between OpenRouter's commercial API, MedGemma via Gradio, or MedGemma via Vertex AI.
+        Choose between OpenRouter's commercial API, MedGemma via Gradio, MedGemma via Vertex AI, or local Ollama.
       </div>
     </div>
     
@@ -177,6 +187,33 @@
         Enter your Google Cloud access token. You can get this from gcloud auth print-access-token.
         <br><strong>Note:</strong> Tokens expire after ~1 hour and need to be refreshed.
       </div>
+    </div>
+    
+    <div class="setting-item" id="ollama-settings" style="display: none;">
+      <label for="ollamaUrl">Ollama API URL</label>
+      <input type="text" id="ollamaUrl" placeholder="http://localhost:11434" value="http://localhost:11434">
+      <div class="help-text">
+        Enter your Ollama API URL. Default is http://localhost:11434 for local installation.
+        <br><strong>Setup:</strong> 
+        <br>1. Install Ollama: <a href="https://ollama.ai/" target="_blank" class="api-key-link">ollama.ai</a>
+        <br>2. Enable CORS: Set environment variable <code>OLLAMA_ORIGINS=chrome-extension://*</code>
+        <br>3. Run: <code>ollama run hf.co/unsloth/medgemma-4b-it-GGUF</code>
+        <br>4. Test connection below
+      </div>
+      
+      <label for="ollamaModel" style="margin-top: 15px;">Model Name</label>
+      <input type="text" id="ollamaModel" placeholder="medgemma-4b-it" value="medgemma-4b-it">
+      <div class="help-text">
+        Model name as it appears in Ollama. Use <code>ollama list</code> to see available models.
+        <br><strong>Recommended:</strong> medgemma-4b-it (download with command above)
+        <br><strong>Troubleshooting 403 error:</strong>
+        <br>• macOS/Linux: <code>OLLAMA_ORIGINS=chrome-extension://* ollama serve</code>
+        <br>• Windows: <code>set OLLAMA_ORIGINS=chrome-extension://* && ollama serve</code>
+        <br>• Or restart Ollama after setting the environment variable
+      </div>
+      
+      <button type="button" id="testOllama" class="save-btn" style="margin-top: 10px;">Test Ollama Connection</button>
+      <div class="status" id="ollamaStatus" style="display: none;"></div>
     </div>
     
     <div class="setting-item" id="model-settings">

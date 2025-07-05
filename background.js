@@ -3,13 +3,16 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'mistralai/mistral-small-3.2-24b-instruct';
 
 // Default prompt template
-const DEFAULT_PROMPT = `You are a medical documentation assistant. Continue the following medical text naturally.
+const DEFAULT_PROMPT = `You are a medical language model specialized in clinical autocompletion.
 
-IMPORTANT: 
-- Only provide what comes AFTER the given text
-- Do not rewrite or repeat any part of the existing text
-- Do not start with "..." or ".." or any dots
-- Just continue from where the text ends naturally`;
+Your only task is to continue clinical sentences using 1 to 5 medically appropriate words.
+
+STRICT RULES:
+Do not repeat the input
+Do not generate full sentences
+Do not add punctuation or explanations
+Only return 1 to 5 words that would most likely follow
+If unsure, return nothing`;
 
 // Get API configuration from storage
 async function getApiConfig() {
@@ -19,8 +22,8 @@ async function getApiConfig() {
     'medgemmaApiUrl',
     'vertexEndpoint',
     'vertexToken',
-    'ollamaUrl',
-    'ollamaModel',
+    'ollamaUrl', // Re-added for Ollama
+    'ollamaModel', // Re-added for Ollama
     'selectedModel',
     'maxTokens',
     'temperature',
@@ -34,8 +37,8 @@ async function getApiConfig() {
     medgemmaUrl: result.medgemmaApiUrl,
     vertexEndpoint: result.vertexEndpoint,
     vertexToken: result.vertexToken,
-    ollamaUrl: result.ollamaUrl || 'http://127.0.0.1:11434',
-    ollamaModel: result.ollamaModel || 'hf.co/unsloth/medgemma-4b-it-GGUF:latest',
+    ollamaUrl: result.ollamaUrl || 'http://127.0.0.1:11434', // Re-added for Ollama
+    ollamaModel: result.ollamaModel, // Re-added for Ollama
     model: result.selectedModel || DEFAULT_MODEL,
     maxTokens: result.maxTokens || 25,
     temperature: result.temperature || 0.3,
@@ -58,8 +61,8 @@ function getPrompt(config) {
     medgemmaUrlPresent: !!config.medgemmaUrl,
     vertexEndpointPresent: !!config.vertexEndpoint,
     vertexTokenPresent: !!config.vertexToken,
-    ollamaUrl: config.ollamaUrl,
-    ollamaModel: config.ollamaModel,
+    ollamaUrl: config.ollamaUrl, // Re-added for Ollama
+    ollamaModel: config.ollamaModel, // Re-added for Ollama
     model: config.model
   });
 })();
@@ -83,6 +86,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     return true; // Keep the message channel open for async response
   }
+  
+  if (request.action === 'getSuggestionWithImage') {
+    getSuggestionWithImage(request.context, request.imageData)
+      .then(suggestion => {
+        sendResponse({ suggestion });
+      })
+      .catch(error => {
+        sendResponse({ error: error.message });
+      });
+    return true;
+  }
 });
 
 async function getSuggestion(context) {
@@ -98,7 +112,7 @@ async function getSuggestion(context) {
       return await getMedGemmaSuggestion(context, config);
     } else if (config.provider === 'medgemma-vertex') {
       return await getVertexSuggestion(context, config);
-    } else if (config.provider === 'ollama-local') {
+    } else if (config.provider === 'ollama-local') { // Re-added for Ollama
       return await getOllamaSuggestion(context, config);
     } else {
       return await getOpenRouterSuggestion(context, config);
@@ -106,6 +120,18 @@ async function getSuggestion(context) {
   } catch (error) {
     console.error('[MedComplete Background] Error getting suggestion:', error);
     return getFallbackSuggestion(context);
+  }
+}
+
+async function getSuggestionWithImage(context, imageData) {
+  const config = await getApiConfig();
+  
+  if (config.provider === 'openrouter') {
+    return await getOpenRouterImageSuggestion(context, imageData, config);
+  } else if (config.provider === 'ollama-local') { // Re-added for Ollama
+    return await getOllamaImageSuggestion(context, imageData, config);
+  } else {
+    return await getSuggestion(context + ' (Image detected but not supported by current provider)');
   }
 }
 
@@ -349,6 +375,86 @@ async function getVertexSuggestion(context, config) {
   }
 }
 
+// Ollama Local API implementation with image support
+async function getOllamaImageSuggestion(context, imageData, config) {
+  if (!config.ollamaUrl) {
+    throw new Error('No Ollama URL configured.');
+  }
+  if (!config.ollamaModel) {
+    throw new Error('No Ollama model configured. Please use a multimodal model like LLaVA.');
+  }
+
+  // Ollama expects the base64 string without the data URL prefix
+  const base64Image = imageData.base64.split(',')[1];
+  
+  const prefixedContext = config.userPrefix ? `${config.userPrefix} ${context}` : context;
+  const systemPrompt = getPrompt(config);
+  const prompt = `Analyze the attached image and continue the following text based on it:\n\nText: "${prefixedContext}"\n\nContinuation (max ${config.maxTokens} words):`;
+
+  try {
+    console.log('[MedComplete Background] Calling Ollama API with image...');
+    
+    const response = await fetch(`${config.ollamaUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: config.ollamaModel,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: prompt,
+            images: [base64Image]
+          }
+        ],
+        stream: false,
+        options: {
+          num_predict: Math.min(config.maxTokens * 2, 100),
+          temperature: config.temperature,
+          top_p: 0.9,
+          stop: ['\n\n', 'Text:', 'Continuation:']
+        }
+      })
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error(`Ollama CORS error (403). Please set OLLAMA_ORIGINS=chrome-extension://* and restart Ollama.`);
+      } else {
+        const errorBody = await response.text();
+        throw new Error(`Ollama request failed: ${response.status} ${response.statusText}. Body: ${errorBody}`);
+      }
+    }
+
+    const data = await response.json();
+    console.log('[MedComplete Background] Ollama image response:', data);
+
+    if (data.message && data.message.content) {
+      let completion = data.message.content.trim();
+      // Clean up the completion
+      completion = completion.replace(/^[\"'']|[\"'']$/g, ''); // Remove quotes
+      completion = completion.replace(/^Continuation:\s*/i, '');
+      completion = completion.replace(/^Completion:\s*/i, '');
+      completion = completion.replace(/^\.{2,}\s*/, ''); // Remove leading dots
+      completion = completion.replace(/^\.\s*/, ''); // Remove single leading dot
+      
+      if (completion && !completion.startsWith(' ') && !context.endsWith(' ')) {
+        completion = ' ' + completion;
+      }
+      
+      console.log('[MedComplete Background] Final Ollama completion:', completion);
+      return completion;
+    }
+    throw new Error('Invalid Ollama response format');
+  } catch (error) {
+    console.error('[MedComplete Background] Ollama image suggestion error:', error);
+    throw error;
+  }
+}
+
 // Ollama Local API implementation
 async function getOllamaSuggestion(context, config) {
   if (!config.ollamaUrl) {
@@ -366,16 +472,25 @@ async function getOllamaSuggestion(context, config) {
     console.log('[MedComplete Background] Calling Ollama API:', config.ollamaUrl);
     console.log('[MedComplete Background] Using model:', config.ollamaModel);
     
-    const prompt = `${systemPrompt}\n\nText: "${prefixedContext}"\n\nContinuation (max ${config.maxTokens} words):`;
+    const userPrompt = `Text: "${prefixedContext}"\n\nContinuation (max ${config.maxTokens} words):`;
     
-    const response = await fetch(`${config.ollamaUrl}/api/generate`, {
+    const response = await fetch(`${config.ollamaUrl}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: config.ollamaModel,
-        prompt: prompt,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userPrompt,
+          }
+        ],
         stream: false,
         options: {
           num_predict: Math.min(config.maxTokens * 2, 100),
@@ -390,18 +505,19 @@ async function getOllamaSuggestion(context, config) {
       if (response.status === 403) {
         throw new Error(`Ollama CORS error (403). Please set OLLAMA_ORIGINS=chrome-extension://* and restart Ollama.`);
       } else {
-        throw new Error(`Ollama request failed: ${response.status} ${response.statusText}`);
+        const errorBody = await response.text();
+        throw new Error(`Ollama request failed: ${response.status} ${response.statusText}. Body: ${errorBody}`);
       }
     }
     
     const data = await response.json();
     console.log('[MedComplete Background] Ollama response:', data);
     
-    if (data.response) {
-      let completion = data.response.trim();
+    if (data.message && data.message.content) {
+      let completion = data.message.content.trim();
       
       // Clean up the completion
-      completion = completion.replace(/^[\"']|[\"']$/g, ''); // Remove quotes
+      completion = completion.replace(/^[\"'']|[\"'']$/g, ''); // Remove quotes
       completion = completion.replace(/^Continuation:\s*/i, ''); // Remove "Continuation:" prefix
       completion = completion.replace(/^Completion:\s*/i, ''); // Remove "Completion:" prefix
       completion = completion.replace(/^\.{2,}\s*/, ''); // Remove leading dots (2 or more)
@@ -416,10 +532,78 @@ async function getOllamaSuggestion(context, config) {
       return completion;
     }
     
-    throw new Error('Invalid Ollama response format - no response found');
+    throw new Error('Invalid Ollama response format - no message content found');
     
   } catch (error) {
     console.error('[MedComplete Background] Ollama error:', error);
+    throw error;
+  }
+}
+
+// OpenRouter API implementation for multimodal suggestions
+async function getOpenRouterImageSuggestion(context, imageData, config) {
+  if (!config.openrouterKey) {
+    throw new Error('No OpenRouter API key configured.');
+  }
+
+  const prefixedContext = config.userPrefix ? `${config.userPrefix} ${context}` : context;
+  const prompt = `Continue this medical text based on the image: "${prefixedContext}"`;
+
+  const messages = [
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: prompt
+        },
+        {
+          type: 'image_url',
+          image_url: { url: imageData.base64 }
+        }
+      ]
+    }
+  ];
+
+  try {
+    console.log('[MedComplete Background] Calling OpenRouter Image API...');
+    const response = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.openrouterKey}`,
+        'HTTP-Referer': 'https://medcomplete.extension',
+        'X-Title': 'MedComplete Extension'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-flash-1.5', // Recommended model for multimodal
+        messages: messages,
+        temperature: config.temperature,
+        max_tokens: Math.min(config.maxTokens * 2, 150)
+      })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`OpenRouter Image API request failed: ${response.status} ${response.statusText}. Body: ${errorBody}`);
+    }
+
+    const data = await response.json();
+    console.log('[MedComplete Background] OpenRouter Image API response:', data);
+    
+    if (data.choices?.[0]?.message?.content) {
+      let completion = data.choices[0].message.content.trim();
+      if (completion && !completion.startsWith(' ') && context && !context.endsWith(' ')) {
+        completion = ' ' + completion;
+      }
+      console.log('[MedComplete Background] Final OpenRouter Image completion:', completion);
+      return completion;
+    }
+    
+    throw new Error('Invalid OpenRouter Image API response format');
+
+  } catch (error) {
+    console.error('[MedComplete Background] OpenRouter image suggestion error:', error);
     throw error;
   }
 }
@@ -598,3 +782,48 @@ function getFallbackSuggestion(context) {
   
   return ' [API Error - Using Fallback]';
 }
+
+/*
+// --- Minimal OpenRouter Image Suggestion Example ---
+// This is a self-contained example for calling the OpenRouter API with an image.
+// It uses environment variables for the API key for demonstration purposes.
+// In the extension, the key is retrieved from chrome.storage.local.
+
+export async function getOpenRouterImageSuggestionExample(prompt, imageUrl) {
+  // In a real scenario, you would get the key from a secure source.
+  // For this example, it assumes an environment variable is set.
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    console.error("OPENROUTER_API_KEY environment variable not set.");
+    return "";
+  }
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "google/gemini-pro-vision", // or any other compatible multimodal model
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: imageUrl } }
+          ]
+        }
+      ]
+    })
+  });
+
+  if (!res.ok) {
+    console.error("API request failed:", res.status, await res.text());
+    return "";
+  }
+
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content ?? "";
+}
+*/

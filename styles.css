@@ -13,6 +13,7 @@
   display: none;
   animation: fadeIn 0.2s ease-in-out;
   line-height: 1.4;
+  margin-top: 5px; /* Ajout d'une marge supérieure pour décaler vers le bas */
 }
 
 .medcomplete-suggestion::before {

@@ -6,6 +6,7 @@ let lastProcessedText = '';
 let pendingRequest = null;
 let isGoogleDocs = false;
 let docsObserver = null;
+let clipboardCheckInterval = null;
 
 // Suggestion caching for performance
 let suggestionCache = new Map();
@@ -67,9 +68,50 @@ function attachListeners() {
   });
 }
 
+// Check clipboard for images every 2 seconds when focused
+function startClipboardCheck() {
+  if (clipboardCheckInterval) return;
+  
+  clipboardCheckInterval = setInterval(async () => {
+    if (!currentElement) return;
+    
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        if (item.types.some(type => type.startsWith('image/'))) {
+          const imageBlob = await item.getType(item.types.find(type => type.startsWith('image/')));
+          const base64 = await blobToBase64(imageBlob);
+          
+          const context = getContext();
+          requestSuggestionWithImage(context, { base64, type: imageBlob.type });
+          break;
+        }
+      }
+    } catch (e) {
+      // Ignore clipboard access errors
+    }
+  }, 2000);
+}
+
+function stopClipboardCheck() {
+  if (clipboardCheckInterval) {
+    clearInterval(clipboardCheckInterval);
+    clipboardCheckInterval = null;
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
 // Handle focus events
 function handleFocus(e) {
   currentElement = e.target;
+  startClipboardCheck();
 }
 
 // Handle blur events
@@ -77,6 +119,7 @@ function handleBlur(e) {
   if (currentElement === e.target) {
     currentElement = null;
     hideSuggestion();
+    stopClipboardCheck();
   }
 }
 
@@ -309,6 +352,29 @@ async function requestSuggestion() {
     } else {
       console.error('[MedComplete] Error getting suggestion:', error);
     }
+  } finally {
+    pendingRequest = null;
+  }
+}
+
+// Request suggestion with image
+async function requestSuggestionWithImage(context, imageData) {
+  if (!extensionContextValid || !chrome.runtime?.sendMessage) return;
+  
+  try {
+    pendingRequest = chrome.runtime.sendMessage({
+      action: 'getSuggestionWithImage',
+      context: context,
+      imageData: imageData
+    });
+    
+    const response = await pendingRequest;
+    if (response?.suggestion) {
+      showSuggestion(response.suggestion);
+      showProactiveIndicator();
+    }
+  } catch (error) {
+    console.error('[MedComplete] Error getting image suggestion:', error);
   } finally {
     pendingRequest = null;
   }

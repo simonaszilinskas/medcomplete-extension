@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "clipboardWrite"
+    "clipboardWrite",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://*/*",

@@ -16,21 +16,27 @@ async function getApiConfig() {
   const result = await chrome.storage.local.get([
     'apiProvider', 
     'openrouterApiKey', 
-    'medgemmaApiUrl', 
+    'medgemmaApiUrl',
+    'vertexEndpoint',
+    'vertexToken',
     'selectedModel',
     'maxTokens',
     'temperature',
-    'customPrompt'
+    'customPrompt',
+    'userPrefix'
   ]);
   
   return {
     provider: result.apiProvider || 'openrouter',
     openrouterKey: result.openrouterApiKey,
     medgemmaUrl: result.medgemmaApiUrl,
+    vertexEndpoint: result.vertexEndpoint,
+    vertexToken: result.vertexToken,
     model: result.selectedModel || DEFAULT_MODEL,
     maxTokens: result.maxTokens || 25,
     temperature: result.temperature || 0.3,
-    customPrompt: result.customPrompt || DEFAULT_PROMPT
+    customPrompt: result.customPrompt || DEFAULT_PROMPT,
+    userPrefix: result.userPrefix || ''
   };
 }
 
@@ -46,6 +52,8 @@ function getPrompt(config) {
     provider: config.provider,
     openrouterKeyPresent: !!config.openrouterKey,
     medgemmaUrlPresent: !!config.medgemmaUrl,
+    vertexEndpointPresent: !!config.vertexEndpoint,
+    vertexTokenPresent: !!config.vertexToken,
     model: config.model
   });
 })();
@@ -82,6 +90,8 @@ async function getSuggestion(context) {
     // Route to appropriate API
     if (config.provider === 'medgemma') {
       return await getMedGemmaSuggestion(context, config);
+    } else if (config.provider === 'medgemma-vertex') {
+      return await getVertexSuggestion(context, config);
     } else {
       return await getOpenRouterSuggestion(context, config);
     }
@@ -99,6 +109,7 @@ async function getMedGemmaSuggestion(context, config) {
   
   const baseUrl = config.medgemmaUrl.replace(/\/$/, ''); // Remove trailing slash
   const maxTokens = config.maxTokens;
+  const prefixedContext = config.userPrefix ? `${config.userPrefix} ${context}` : context;
   
   try {
     console.log('[MedComplete Background] Calling MedGemma API:', baseUrl);
@@ -110,7 +121,7 @@ async function getMedGemmaSuggestion(context, config) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        data: [context, maxTokens]
+        data: [prefixedContext, maxTokens]
       })
     });
     
@@ -217,6 +228,119 @@ async function getMedGemmaSuggestion(context, config) {
   }
 }
 
+// Vertex AI API implementation
+async function getVertexSuggestion(context, config) {
+  if (!config.vertexEndpoint) {
+    throw new Error('No Vertex AI endpoint configured. Please set your endpoint URL in the extension settings.');
+  }
+  
+  if (!config.vertexToken) {
+    throw new Error('No Vertex AI access token configured. Please set your access token in the extension settings.');
+  }
+  
+  const prefixedContext = config.userPrefix ? `${config.userPrefix} ${context}` : context;
+  const systemPrompt = getPrompt(config);
+  
+  try {
+    console.log('[MedComplete Background] Calling Vertex AI API:', config.vertexEndpoint);
+    
+    const response = await fetch(config.vertexEndpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.vertexToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        instances: [
+          {
+            "@requestFormat": "chatCompletions",
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: `Text: "${prefixedContext}"\n\nContinuation (max ${config.maxTokens} words):`
+                  }
+                ]
+              }
+            ],
+            max_tokens: Math.min(config.maxTokens * 2, 100),
+            temperature: config.temperature,
+            top_p: 1.0,
+            top_k: -1
+          }
+        ]
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Vertex AI request failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('[MedComplete Background] Vertex AI response:', data);
+    
+    if (data.predictions) {
+      let completion = '';
+      
+      // Handle the actual Vertex AI response format where predictions is an object with choices
+      if (data.predictions.choices && data.predictions.choices.length > 0) {
+        const choice = data.predictions.choices[0];
+        if (choice.message && choice.message.content) {
+          completion = choice.message.content;
+        }
+      } 
+      // Fallback: Handle array format if it exists
+      else if (Array.isArray(data.predictions) && data.predictions.length > 0) {
+        const prediction = data.predictions[0];
+        
+        if (prediction.candidates && prediction.candidates.length > 0) {
+          const candidate = prediction.candidates[0];
+          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+            completion = candidate.content.parts[0].text;
+          }
+        } else if (prediction.choices && prediction.choices.length > 0) {
+          const choice = prediction.choices[0];
+          if (choice.message && choice.message.content) {
+            completion = choice.message.content;
+          }
+        } else if (typeof prediction === 'string') {
+          completion = prediction;
+        }
+      }
+      
+      console.log('[MedComplete Background] Raw Vertex completion:', completion);
+      
+      // Clean up the completion
+      completion = completion.trim();
+      completion = completion.replace(/^[\"']|[\"']$/g, ''); // Remove quotes
+      completion = completion.replace(/^Continuation:\\s*/i, ''); // Remove "Continuation:" prefix
+      completion = completion.replace(/^Completion:\\s*/i, ''); // Remove "Completion:" prefix
+      completion = completion.replace(/^\\.{2,}\\s*/, ''); // Remove leading dots (2 or more)
+      completion = completion.replace(/^\\.\\s*/, ''); // Remove single leading dot
+      
+      // Ensure it starts with a space if needed
+      if (completion && !completion.startsWith(' ') && !context.endsWith(' ')) {
+        completion = ' ' + completion;
+      }
+      
+      console.log('[MedComplete Background] Final Vertex completion:', completion);
+      return completion;
+    }
+    
+    throw new Error('Invalid Vertex AI response format - no predictions found');
+    
+  } catch (error) {
+    console.error('[MedComplete Background] Vertex AI error:', error);
+    throw error;
+  }
+}
+
 // OpenRouter API implementation (existing logic)
 async function getOpenRouterSuggestion(context, config) {
   if (!config.openrouterKey) {
@@ -234,9 +358,10 @@ async function getOpenRouterSuggestion(context, config) {
   
   // Get the appropriate prompt and create completion request
   const systemPrompt = getPrompt(config);
+  const prefixedContext = config.userPrefix ? `${config.userPrefix} ${context}` : context;
   const userPrompt = `${systemPrompt}
 
-Text: "${context}"
+Text: "${prefixedContext}"
 
 Continuation (max ${config.maxTokens} words):`;
 

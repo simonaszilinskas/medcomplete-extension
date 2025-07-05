@@ -136,8 +136,8 @@ function getContext() {
     }
   }
   
-  // Get text before cursor (last 100 characters for context)
-  const contextStart = Math.max(0, cursorPosition - 100);
+  // Get text before cursor (last 500 characters for context)
+  const contextStart = Math.max(0, cursorPosition - 500);
   return text.substring(contextStart, cursorPosition);
 }
 
@@ -407,7 +407,7 @@ function getContentEditableCursorPosition(element, range) {
 // Smart suggestion processing - handles spacing, periods, and text overlap
 function processSuggestion(rawSuggestion, currentText, cursorPosition) {
   console.log('[MedComplete] Processing suggestion:', rawSuggestion);
-  console.log('[MedComplete] Current text context:', currentText.substring(Math.max(0, cursorPosition - 50), cursorPosition + 50));
+  console.log('[MedComplete] Current text context:', currentText.substring(Math.max(0, cursorPosition - 100), cursorPosition + 100));
   
   let suggestion = rawSuggestion;
   
@@ -444,12 +444,12 @@ function processSuggestion(rawSuggestion, currentText, cursorPosition) {
   }
   
   // Handle text overlap - find the longest overlap between end of current text and start of suggestion
-  const wordsBeforeCursor = beforeCursor.trim().split(/\s+/).filter(word => word.length > 0).slice(-10); // Last 10 words
+  const wordsBeforeCursor = beforeCursor.trim().split(/\s+/).filter(word => word.length > 0).slice(-20); // Last 20 words
   let maxOverlap = 0;
   let overlapIndex = 0;
   
   // Try to find overlap starting from suggestion beginning
-  for (let i = 1; i <= Math.min(wordsBeforeCursor.length, 8); i++) {
+  for (let i = 1; i <= Math.min(wordsBeforeCursor.length, 15); i++) {
     const endWords = wordsBeforeCursor.slice(-i).join(' ').toLowerCase().trim();
     const suggestionStart = suggestion.toLowerCase().trim();
     
@@ -708,7 +708,7 @@ function getGoogleDocsContext() {
   // Method 1: Get text from current lines
   const lines = document.querySelectorAll('.kix-lineview');
   if (lines.length > 0) {
-    // Get text from the last few lines (up to 100 characters)
+    // Get text from the last few lines (up to 500 characters)
     for (let i = Math.max(0, lines.length - 3); i < lines.length; i++) {
       const lineText = lines[i].textContent || '';
       context += lineText + ' ';
@@ -722,7 +722,7 @@ function getGoogleDocsContext() {
     if (range.startContainer && range.startContainer.textContent) {
       const fullText = range.startContainer.textContent;
       const cursorPos = range.startOffset;
-      const beforeCursor = fullText.substring(Math.max(0, cursorPos - 100), cursorPos);
+      const beforeCursor = fullText.substring(Math.max(0, cursorPos - 500), cursorPos);
       if (beforeCursor.length > context.length) {
         context = beforeCursor;
       }
@@ -734,12 +734,12 @@ function getGoogleDocsContext() {
     const docsContent = document.querySelector('.kix-page-content-wrapper');
     if (docsContent) {
       const text = docsContent.textContent || '';
-      context = text.slice(-100);
+      context = text.slice(-500);
     }
   }
   
-  // Return last 100 characters, trimmed
-  return context.slice(-100).trim();
+  // Return last 500 characters, trimmed
+  return context.slice(-500).trim();
 }
 
 // Accept suggestion in Google Docs using clipboard

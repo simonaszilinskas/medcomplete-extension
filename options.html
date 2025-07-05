@@ -194,25 +194,11 @@
     </div>
     
     <div class="setting-item">
-      <label for="systemPrompt">System Prompt</label>
-      <select id="promptPreset">
-        <option value="default">Default Medical Assistant</option>
-        <option value="general">General Practice</option>
-        <option value="cardiology">Cardiology</option>
-        <option value="emergency">Emergency Medicine</option>
-        <option value="psychiatry">Psychiatry</option>
-        <option value="custom">Custom Prompt</option>
-      </select>
-      <div class="help-text">
-        Choose a preset prompt or create your own custom prompt for specific medical specialties.
-      </div>
-    </div>
-    
-    <div class="setting-item" id="custom-prompt-section" style="display: none;">
-      <label for="customPrompt">Custom System Prompt</label>
-      <textarea id="customPrompt" rows="4" placeholder="Enter your custom system prompt here..."></textarea>
+      <label for="customPrompt">System Prompt</label>
+      <textarea id="customPrompt" rows="6" placeholder="Enter your system prompt here. Define how the AI should behave, what medical terminology to use, and any specific requirements..."></textarea>
       <div class="help-text">
         Define how the AI should behave. Include instructions about medical accuracy, tone, and specific requirements.
+        <br><strong>Tip:</strong> Be specific about the medical specialty, terminology preferences, and response style you want.
       </div>
     </div>
     

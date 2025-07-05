@@ -1,45 +1,11 @@
-// Predefined prompt templates
-const PROMPT_PRESETS = {
-  default: `You are a medical documentation assistant. Continue the following medical text naturally.
+// Default prompt template
+const DEFAULT_PROMPT = `You are a medical documentation assistant. Continue the following medical text naturally.
 
 IMPORTANT: 
 - Only provide what comes AFTER the given text
 - Do not rewrite or repeat any part of the existing text
 - Do not start with "..." or ".." or any dots
-- Just continue from where the text ends naturally`,
-
-  general: `You are a general practice documentation assistant. Continue medical text with focus on:
-- Clear, concise medical terminology
-- Patient-centered language
-- Common conditions and treatments
-- Preventive care recommendations
-
-Continue naturally from where the text ends.`,
-
-  cardiology: `You are a cardiology documentation specialist. Continue medical text with focus on:
-- Cardiovascular terminology and procedures
-- Heart conditions, treatments, and medications
-- Risk factors and lifestyle recommendations
-- Diagnostic test interpretations
-
-Continue naturally from where the text ends.`,
-
-  emergency: `You are an emergency medicine documentation assistant. Continue medical text with focus on:
-- Urgent care protocols and procedures
-- Triage assessments and priorities
-- Emergency medications and interventions
-- Time-sensitive decision making
-
-Continue naturally from where the text ends.`,
-
-  psychiatry: `You are a psychiatric documentation specialist. Continue medical text with focus on:
-- Mental health terminology and assessments
-- Psychiatric medications and side effects
-- Therapeutic interventions and treatment plans
-- Patient safety and crisis management
-
-Continue naturally from where the text ends.`
-};
+- Just continue from where the text ends naturally`;
 
 // Load saved settings
 async function loadSettings() {
@@ -50,7 +16,6 @@ async function loadSettings() {
     'selectedModel',
     'maxTokens',
     'temperature',
-    'promptPreset',
     'customPrompt'
   ]);
   
@@ -76,17 +41,12 @@ async function loadSettings() {
   document.getElementById('temperature').value = result.temperature || 0.3;
   document.getElementById('temperatureValue').textContent = result.temperature || 0.3;
   
-  // Load prompt settings
-  const promptPreset = result.promptPreset || 'default';
-  document.getElementById('promptPreset').value = promptPreset;
+  // Load custom prompt or use default
+  const customPrompt = result.customPrompt || DEFAULT_PROMPT;
+  document.getElementById('customPrompt').value = customPrompt;
   
-  if (result.customPrompt) {
-    document.getElementById('customPrompt').value = result.customPrompt;
-  }
-  
-  // Update UI based on provider and prompt preset
+  // Update UI based on provider
   updateProviderUI(apiProvider);
-  updatePromptUI(promptPreset);
 }
 
 // Update UI based on selected provider
@@ -106,17 +66,6 @@ function updateProviderUI(provider) {
   }
 }
 
-// Update UI based on prompt preset selection
-function updatePromptUI(preset) {
-  const customSection = document.getElementById('custom-prompt-section');
-  
-  if (preset === 'custom') {
-    customSection.style.display = 'block';
-  } else {
-    customSection.style.display = 'none';
-  }
-}
-
 // Save settings
 async function saveSettings() {
   const apiProvider = document.getElementById('apiProvider').value;
@@ -125,7 +74,6 @@ async function saveSettings() {
   const model = document.getElementById('model').value;
   const maxTokens = parseInt(document.getElementById('maxTokens').value);
   const temperature = parseFloat(document.getElementById('temperature').value);
-  const promptPreset = document.getElementById('promptPreset').value;
   const customPrompt = document.getElementById('customPrompt').value.trim();
   const saveBtn = document.getElementById('saveBtn');
   const status = document.getElementById('status');
@@ -159,8 +107,8 @@ async function saveSettings() {
     return;
   }
   
-  if (promptPreset === 'custom' && !customPrompt) {
-    showStatus('error', 'Please enter a custom prompt or select a preset');
+  if (!customPrompt) {
+    showStatus('error', 'Please enter a system prompt');
     return;
   }
   
@@ -174,12 +122,8 @@ async function saveSettings() {
       selectedModel: model,
       maxTokens: maxTokens,
       temperature: temperature,
-      promptPreset: promptPreset
+      customPrompt: customPrompt
     };
-    
-    if (customPrompt) {
-      settingsToSave.customPrompt = customPrompt;
-    }
     
     if (apiProvider === 'openrouter') {
       settingsToSave.openrouterApiKey = apiKey;
@@ -288,11 +232,6 @@ document.getElementById('saveBtn').addEventListener('click', saveSettings);
 // API provider change
 document.getElementById('apiProvider').addEventListener('change', (e) => {
   updateProviderUI(e.target.value);
-});
-
-// Prompt preset change
-document.getElementById('promptPreset').addEventListener('change', (e) => {
-  updatePromptUI(e.target.value);
 });
 
 // Temperature slider update

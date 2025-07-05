@@ -2,48 +2,14 @@
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'mistralai/mistral-small-3.2-24b-instruct';
 
-// Prompt templates
-const PROMPT_TEMPLATES = {
-  default: `You are a medical documentation assistant. Continue the following medical text naturally.
+// Default prompt template
+const DEFAULT_PROMPT = `You are a medical documentation assistant. Continue the following medical text naturally.
 
 IMPORTANT: 
 - Only provide what comes AFTER the given text
 - Do not rewrite or repeat any part of the existing text
 - Do not start with "..." or ".." or any dots
-- Just continue from where the text ends naturally`,
-
-  general: `You are a general practice documentation assistant. Continue medical text with focus on:
-- Clear, concise medical terminology
-- Patient-centered language
-- Common conditions and treatments
-- Preventive care recommendations
-
-Continue naturally from where the text ends.`,
-
-  cardiology: `You are a cardiology documentation specialist. Continue medical text with focus on:
-- Cardiovascular terminology and procedures
-- Heart conditions, treatments, and medications
-- Risk factors and lifestyle recommendations
-- Diagnostic test interpretations
-
-Continue naturally from where the text ends.`,
-
-  emergency: `You are an emergency medicine documentation assistant. Continue medical text with focus on:
-- Urgent care protocols and procedures
-- Triage assessments and priorities
-- Emergency medications and interventions
-- Time-sensitive decision making
-
-Continue naturally from where the text ends.`,
-
-  psychiatry: `You are a psychiatric documentation specialist. Continue medical text with focus on:
-- Mental health terminology and assessments
-- Psychiatric medications and side effects
-- Therapeutic interventions and treatment plans
-- Patient safety and crisis management
-
-Continue naturally from where the text ends.`
-};
+- Just continue from where the text ends naturally`;
 
 // Get API configuration from storage
 async function getApiConfig() {
@@ -54,7 +20,6 @@ async function getApiConfig() {
     'selectedModel',
     'maxTokens',
     'temperature',
-    'promptPreset',
     'customPrompt'
   ]);
   
@@ -65,18 +30,13 @@ async function getApiConfig() {
     model: result.selectedModel || DEFAULT_MODEL,
     maxTokens: result.maxTokens || 25,
     temperature: result.temperature || 0.3,
-    promptPreset: result.promptPreset || 'default',
-    customPrompt: result.customPrompt
+    customPrompt: result.customPrompt || DEFAULT_PROMPT
   };
 }
 
-// Get the appropriate prompt based on configuration
+// Get the user-defined prompt
 function getPrompt(config) {
-  if (config.promptPreset === 'custom' && config.customPrompt) {
-    return config.customPrompt;
-  }
-  
-  return PROMPT_TEMPLATES[config.promptPreset] || PROMPT_TEMPLATES.default;
+  return config.customPrompt;
 }
 
 // Test API configuration on extension load

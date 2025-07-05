@@ -2,21 +2,81 @@
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'mistralai/mistral-small-3.2-24b-instruct';
 
+// Prompt templates
+const PROMPT_TEMPLATES = {
+  default: `You are a medical documentation assistant. Continue the following medical text naturally.
+
+IMPORTANT: 
+- Only provide what comes AFTER the given text
+- Do not rewrite or repeat any part of the existing text
+- Do not start with "..." or ".." or any dots
+- Just continue from where the text ends naturally`,
+
+  general: `You are a general practice documentation assistant. Continue medical text with focus on:
+- Clear, concise medical terminology
+- Patient-centered language
+- Common conditions and treatments
+- Preventive care recommendations
+
+Continue naturally from where the text ends.`,
+
+  cardiology: `You are a cardiology documentation specialist. Continue medical text with focus on:
+- Cardiovascular terminology and procedures
+- Heart conditions, treatments, and medications
+- Risk factors and lifestyle recommendations
+- Diagnostic test interpretations
+
+Continue naturally from where the text ends.`,
+
+  emergency: `You are an emergency medicine documentation assistant. Continue medical text with focus on:
+- Urgent care protocols and procedures
+- Triage assessments and priorities
+- Emergency medications and interventions
+- Time-sensitive decision making
+
+Continue naturally from where the text ends.`,
+
+  psychiatry: `You are a psychiatric documentation specialist. Continue medical text with focus on:
+- Mental health terminology and assessments
+- Psychiatric medications and side effects
+- Therapeutic interventions and treatment plans
+- Patient safety and crisis management
+
+Continue naturally from where the text ends.`
+};
+
 // Get API configuration from storage
 async function getApiConfig() {
   const result = await chrome.storage.local.get([
     'apiProvider', 
     'openrouterApiKey', 
     'medgemmaApiUrl', 
-    'selectedModel'
+    'selectedModel',
+    'maxTokens',
+    'temperature',
+    'promptPreset',
+    'customPrompt'
   ]);
   
   return {
     provider: result.apiProvider || 'openrouter',
     openrouterKey: result.openrouterApiKey,
     medgemmaUrl: result.medgemmaApiUrl,
-    model: result.selectedModel || DEFAULT_MODEL
+    model: result.selectedModel || DEFAULT_MODEL,
+    maxTokens: result.maxTokens || 25,
+    temperature: result.temperature || 0.3,
+    promptPreset: result.promptPreset || 'default',
+    customPrompt: result.customPrompt
   };
+}
+
+// Get the appropriate prompt based on configuration
+function getPrompt(config) {
+  if (config.promptPreset === 'custom' && config.customPrompt) {
+    return config.customPrompt;
+  }
+  
+  return PROMPT_TEMPLATES[config.promptPreset] || PROMPT_TEMPLATES.default;
 }
 
 // Test API configuration on extension load
@@ -78,7 +138,7 @@ async function getMedGemmaSuggestion(context, config) {
   }
   
   const baseUrl = config.medgemmaUrl.replace(/\/$/, ''); // Remove trailing slash
-  const maxTokens = 20;
+  const maxTokens = config.maxTokens;
   
   try {
     console.log('[MedComplete Background] Calling MedGemma API:', baseUrl);
@@ -212,29 +272,24 @@ async function getOpenRouterSuggestion(context, config) {
     lastChars: config.openrouterKey.substring(config.openrouterKey.length - 10)
   });
   
-  // Create a medical-focused prompt for completion
-  const prompt = `You are a medical documentation assistant. Continue the following medical text naturally. 
-
-IMPORTANT: 
-- Only provide what comes AFTER the given text
-- Do not rewrite or repeat any part of the existing text
-- Do not start with "..." or ".." or any dots
-- Just continue from where the text ends naturally
+  // Get the appropriate prompt and create completion request
+  const systemPrompt = getPrompt(config);
+  const userPrompt = `${systemPrompt}
 
 Text: "${context}"
 
-Continuation (max 15 words):`;
+Continuation (max ${config.maxTokens} words):`;
 
   const requestBody = {
     model: config.model,
     messages: [
       {
         role: 'user',
-        content: prompt
+        content: userPrompt
       }
     ],
-    temperature: 0.7,
-    max_tokens: 50
+    temperature: config.temperature,
+    max_tokens: Math.min(config.maxTokens * 2, 100) // Estimate tokens as ~2x words
   };
   
   const requestDetails = {

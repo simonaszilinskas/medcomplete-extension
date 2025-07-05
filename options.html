@@ -124,6 +124,17 @@
     <h2>API Configuration</h2>
     
     <div class="setting-item">
+      <label for="apiProvider">API Provider</label>
+      <select id="apiProvider">
+        <option value="openrouter">OpenRouter (Multiple Models)</option>
+        <option value="medgemma">MedGemma (Gradio)</option>
+      </select>
+      <div class="help-text">
+        Choose between OpenRouter's commercial API or MedGemma via Gradio.
+      </div>
+    </div>
+    
+    <div class="setting-item" id="openrouter-settings">
       <label for="apiKey">OpenRouter API Key</label>
       <input type="password" id="apiKey" placeholder="sk-or-v1-...">
       <div class="help-text">
@@ -132,7 +143,16 @@
       </div>
     </div>
     
-    <div class="setting-item">
+    <div class="setting-item" id="medgemma-settings" style="display: none;">
+      <label for="medgemmaUrl">MedGemma Gradio URL</label>
+      <input type="text" id="medgemmaUrl" placeholder="https://your-url.gradio.live">
+      <div class="help-text">
+        Enter your MedGemma Gradio URL. You can get this from your Colab or Gradio deployment.
+        <br><strong>Example:</strong> https://abc123-medgemma.gradio.live
+      </div>
+    </div>
+    
+    <div class="setting-item" id="model-settings">
       <label for="model">AI Model</label>
       <select id="model">
         <option value="mistralai/mistral-small-3.2-24b-instruct">Mistral Small (Recommended)</option>
@@ -141,7 +161,7 @@
         <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
       </select>
       <div class="help-text">
-        Choose the AI model for generating medical text completions. Mistral Small provides good balance of quality and cost.
+        Choose the AI model for generating medical text completions. Only applies to OpenRouter.
       </div>
     </div>
     
